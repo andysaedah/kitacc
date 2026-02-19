@@ -36,7 +36,7 @@ $isProduction = (getenv('APP_ENV') === 'production');
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 
-<body>
+<body data-session-timeout="<?php echo (int) getSetting('session_timeout', '30'); ?>">
     <div class="app-wrapper" id="appWrapper">
         <?php include __DIR__ . '/sidebar.php'; ?>
 

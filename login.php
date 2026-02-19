@@ -70,6 +70,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isAjax()) {
                 <span id="loginAlertText"></span>
             </div>
 
+            <?php if (isset($_GET['timeout'])): ?>
+                <div class="alert alert-warning mb-4">
+                    <i class="fas fa-clock alert-icon"></i>
+                    <span>Your session has expired due to inactivity. Please login again.</span>
+                </div>
+            <?php endif; ?>
+
             <form id="loginForm" class="login-form" data-validate>
                 <div class="form-group">
                     <label for="username" class="form-label">Username</label>

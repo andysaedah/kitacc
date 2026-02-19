@@ -27,6 +27,35 @@ function requireLogin(): void
         exit;
     }
 
+    // Session inactivity timeout
+    $timeoutMinutes = (int) getSetting('session_timeout', '30');
+    $timeoutSeconds = $timeoutMinutes * 60;
+    if (!empty($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > $timeoutSeconds) {
+        logoutUser();
+        if (isAjax()) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'message' => 'Session expired due to inactivity. Please login again.']);
+            exit;
+        }
+        header('Location: login.php?timeout=1');
+        exit;
+    }
+
+    // Absolute session lifetime: 12 hours max
+    if (!empty($_SESSION['login_time']) && (time() - $_SESSION['login_time']) > 43200) {
+        logoutUser();
+        if (isAjax()) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'message' => 'Session expired. Please login again.']);
+            exit;
+        }
+        header('Location: login.php?timeout=1');
+        exit;
+    }
+
+    // Update last activity timestamp
+    $_SESSION['last_activity'] = time();
+
     // Validate session fingerprint (User-Agent binding)
     if (!empty($_SESSION['ua_fingerprint'])) {
         $currentFingerprint = hash('sha256', $_SERVER['HTTP_USER_AGENT'] ?? '');
@@ -164,6 +193,8 @@ function loginUser(string $username, string $password): array
 
         // Set session
         $_SESSION['user_id'] = $user['id'];
+        $_SESSION['last_activity'] = time();
+        $_SESSION['login_time'] = time();
         clearUserCache();
 
         // Audit log

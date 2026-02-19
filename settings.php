@@ -15,6 +15,7 @@ $churchName = getSetting('church_name', 'My Church');
 $timezone = getSetting('timezone', 'Asia/Kuala_Lumpur');
 $accountingMode = getSetting('accounting_mode', 'simple');
 $currencySymbol = getSetting('currency_symbol', 'RM');
+$sessionTimeout = getSetting('session_timeout', '30');
 
 // Common timezones
 $timezones = [
@@ -114,6 +115,21 @@ include __DIR__ . '/includes/header.php';
                             </option>
                         <?php endforeach; ?>
                     </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label required">Session Timeout (minutes)</label>
+                    <select name="session_timeout" class="form-control" style="max-width: 200px;">
+                        <?php
+                        $timeoutOptions = [15 => '15 minutes', 30 => '30 minutes (recommended)', 60 => '1 hour', 120 => '2 hours'];
+                        foreach ($timeoutOptions as $val => $label):
+                        ?>
+                            <option value="<?php echo $val; ?>" <?php echo $sessionTimeout == $val ? 'selected' : ''; ?>>
+                                <?php echo $label; ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <span class="form-help">Auto-logout after inactivity. OWASP recommends 15-30 min for financial apps.</span>
                 </div>
 
                 <div class="form-group mt-4">

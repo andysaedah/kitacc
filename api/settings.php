@@ -20,6 +20,7 @@ try {
             'currency_symbol' => trim($_POST['currency_symbol'] ?? 'RM'),
             'timezone' => trim($_POST['timezone'] ?? 'Asia/Kuala_Lumpur'),
             'accounting_mode' => in_array($_POST['accounting_mode'] ?? '', ['simple', 'fund']) ? $_POST['accounting_mode'] : 'simple',
+            'session_timeout' => in_array($_POST['session_timeout'] ?? '', ['15', '30', '60', '120']) ? $_POST['session_timeout'] : '30',
         ];
 
         foreach ($settings as $key => $value) {

@@ -24,6 +24,7 @@ const KiTAcc = {
         this.initPasswordToggle();
         this.initAnimatedCounters();
         this.initBottomNav();
+        this.initSessionTimeout();
     },
 
     // ========================================
@@ -539,6 +540,116 @@ const KiTAcc = {
      */
     confirm(message) {
         return window.confirm(message);
+    },
+
+    // ========================================
+    // SESSION TIMEOUT (Client-side idle timer)
+    // ========================================
+    initSessionTimeout() {
+        // Read config from data attribute set by PHP
+        const body = document.body;
+        const timeoutMinutes = parseInt(body.dataset.sessionTimeout || '30', 10);
+        if (timeoutMinutes <= 0) return;
+
+        const timeoutMs = timeoutMinutes * 60 * 1000;
+        const warningMs = 2 * 60 * 1000; // Show warning 2 minutes before expiry
+        let idleTimer = null;
+        let warningTimer = null;
+        let countdownInterval = null;
+        let modalEl = null;
+
+        const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+
+        function createModal() {
+            if (document.getElementById('sessionTimeoutModal')) return;
+            const modal = document.createElement('div');
+            modal.id = 'sessionTimeoutModal';
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal" style="max-width:420px;">
+                    <div class="modal-header">
+                        <h3 class="modal-title"><i class="fas fa-clock" style="color:var(--warning);margin-right:0.5rem;"></i>Session Expiring</h3>
+                    </div>
+                    <div class="modal-body" style="text-align:center;">
+                        <p style="margin-bottom:0.75rem;">Your session will expire due to inactivity in</p>
+                        <p id="sessionCountdown" style="font-size:2rem;font-weight:700;color:var(--danger);margin:0.5rem 0;">2:00</p>
+                        <p class="text-muted" style="font-size:0.8125rem;">Click below to continue working.</p>
+                    </div>
+                    <div class="modal-footer" style="justify-content:center;">
+                        <button class="btn btn-primary" id="sessionStayBtn"><i class="fas fa-check"></i> Stay Logged In</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(modal);
+            modalEl = modal;
+
+            document.getElementById('sessionStayBtn').addEventListener('click', () => {
+                hideWarning();
+                resetTimer();
+                // Ping server to refresh session
+                KiTAcc.post(window.location.href, { action: 'ping' }, function() {}, { method: 'GET' });
+            });
+        }
+
+        function showWarning() {
+            createModal();
+            modalEl.classList.add('active');
+            let remaining = warningMs / 1000;
+
+            const countdownEl = document.getElementById('sessionCountdown');
+            countdownEl.textContent = formatCountdown(remaining);
+
+            countdownInterval = setInterval(() => {
+                remaining--;
+                if (remaining <= 0) {
+                    clearInterval(countdownInterval);
+                    window.location.href = 'login.php?timeout=1';
+                    return;
+                }
+                countdownEl.textContent = formatCountdown(remaining);
+            }, 1000);
+        }
+
+        function hideWarning() {
+            if (modalEl) modalEl.classList.remove('active');
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+        }
+
+        function formatCountdown(secs) {
+            const m = Math.floor(secs / 60);
+            const s = secs % 60;
+            return m + ':' + (s < 10 ? '0' : '') + s;
+        }
+
+        function resetTimer() {
+            if (idleTimer) clearTimeout(idleTimer);
+            if (warningTimer) clearTimeout(warningTimer);
+            hideWarning();
+
+            // Show warning 2 min before timeout
+            warningTimer = setTimeout(() => {
+                showWarning();
+            }, timeoutMs - warningMs);
+
+            // Hard redirect at timeout
+            idleTimer = setTimeout(() => {
+                window.location.href = 'login.php?timeout=1';
+            }, timeoutMs);
+        }
+
+        // Listen for user activity
+        activityEvents.forEach(evt => {
+            document.addEventListener(evt, () => {
+                // Only reset if warning is not showing
+                if (!modalEl || !modalEl.classList.contains('active')) {
+                    resetTimer();
+                }
+            }, { passive: true });
+        });
+
+        resetTimer();
     }
 };
 
