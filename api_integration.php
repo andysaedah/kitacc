@@ -108,13 +108,12 @@ include __DIR__ . '/includes/header.php';
         <form id="smtpForm">
             <div class="form-group">
                 <label class="form-label required">API Key</label>
-                <div style="position: relative;">
-                    <input type="password" id="smtpApiKey" name="smtp_api_key" class="form-control"
+                <div class="input-group">
+                    <input type="password" id="smtpApiKey" name="smtp_api_key" class="form-control has-icon-right"
                         value="<?php echo htmlspecialchars($smtpApiKey); ?>"
                         placeholder="api-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" required>
-                    <button type="button" class="toggle-password" onclick="toggleApiKey()"
-                        style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--gray-400);">
-                        <i class="fas fa-eye" id="apiKeyEye"></i>
+                    <button type="button" class="input-group-icon-right toggle-password">
+                        <i class="fas fa-eye"></i>
                     </button>
                 </div>
                 <span class="form-help">Your SMTP2Go API key (starts with "api-")</span>
@@ -166,18 +165,6 @@ include __DIR__ . '/includes/header.php';
 <?php
 $page_scripts = <<<'SCRIPT'
 <script>
-    function toggleApiKey() {
-        const input = document.getElementById('smtpApiKey');
-        const icon = document.getElementById('apiKeyEye');
-        if (input.type === 'password') {
-            input.type = 'text';
-            icon.classList.replace('fa-eye', 'fa-eye-slash');
-        } else {
-            input.type = 'password';
-            icon.classList.replace('fa-eye-slash', 'fa-eye');
-        }
-    }
-
     function saveSmtp() {
         const data = KiTAcc.serializeForm(document.getElementById('smtpForm'));
         data.action = 'save_smtp';
