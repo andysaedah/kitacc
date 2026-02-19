@@ -1,0 +1,19 @@
+# Environment
+.env
+
+# Uploads
+uploads/uploads/
+
+# Minified build output (regenerate with: php build.php)
+css/styles.min.css
+js/app.min.js
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

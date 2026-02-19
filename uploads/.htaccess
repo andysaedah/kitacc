@@ -1,0 +1,17 @@
+# Prevent PHP execution in uploads directory
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php8.c>
+    php_flag engine off
+</IfModule>
+
+<FilesMatch "\.php$">
+    Require all denied
+</FilesMatch>
+
+# Prevent directory listing
+Options -Indexes

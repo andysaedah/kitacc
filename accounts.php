@@ -1,0 +1,168 @@
+<?php
+/**
+ * KiTAcc - Accounts Management
+ * Bank / Petty Cash account CRUD
+ */
+require_once __DIR__ . '/includes/config.php';
+requireLogin();
+requireRole(ROLE_BRANCH_FINANCE);
+
+$user = getCurrentUser();
+$branchId = getActiveBranchId();
+$page_title = 'Accounts - KiTAcc';
+
+try {
+    $pdo = db();
+    $sql = "SELECT a.*, b.name AS branch_name FROM accounts a LEFT JOIN branches b ON a.branch_id = b.id WHERE 1=1";
+    $params = [];
+    if ($branchId !== null) {
+        $sql .= " AND a.branch_id = ?";
+        $params[] = $branchId;
+    }
+    $sql .= " ORDER BY a.name";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $accountList = $stmt->fetchAll();
+
+    // Branches for dropdown (superadmin)
+    $branches = [];
+    if ($user['role'] === ROLE_SUPERADMIN) {
+        $stmt = $pdo->query("SELECT id, name FROM branches WHERE is_active = 1 ORDER BY name");
+        $branches = $stmt->fetchAll();
+    }
+} catch (Exception $e) {
+    $accountList = [];
+    $branches = [];
+}
+
+include __DIR__ . '/includes/header.php';
+?>
+
+<div class="d-flex justify-between align-center mb-6">
+    <div>
+        <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--gray-800);">Accounts</h1>
+        <p class="text-muted">Manage bank accounts and petty cash</p>
+    </div>
+    <button class="btn btn-primary" onclick="KiTAcc.openModal('addAccountModal')"><i class="fas fa-plus"></i> Add
+        Account</button>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <?php if (empty($accountList)): ?>
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-body">
+                <div class="empty-state"><i class="fas fa-university"></i>
+                    <h3>No Accounts</h3>
+                    <p>Add your first bank account or petty cash.</p>
+                </div>
+            </div>
+        </div>
+    <?php else: ?>
+        <?php foreach ($accountList as $acc): ?>
+            <div class="stat-card" style="cursor: default;">
+                <div class="stat-icon <?php echo $acc['type'] === 'bank' ? 'primary' : 'secondary'; ?>">
+                    <i class="fas <?php echo $acc['type'] === 'bank' ? 'fa-university' : 'fa-coins'; ?>"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-label">
+                        <?php echo ucfirst(str_replace('_', ' ', $acc['type'])); ?>
+                    </div>
+                    <div class="stat-value" style="font-size: 1.125rem;">
+                        <?php echo htmlspecialchars($acc['name']); ?>
+                    </div>
+                    <?php if ($acc['account_number']): ?>
+                        <div class="text-muted mt-1" style="font-size: 0.75rem;">
+                            <?php echo htmlspecialchars($acc['account_number']); ?>
+                        </div>
+                    <?php endif; ?>
+                    <div class="font-semibold mt-2 text-primary">
+                        <?php echo formatCurrency($acc['balance']); ?>
+                    </div>
+                    <div class="d-flex gap-2 mt-2">
+                        <button class="btn btn-sm btn-ghost"
+                            onclick="editAccount(<?php echo $acc['id']; ?>, '<?php echo htmlspecialchars(addslashes($acc['name'])); ?>', '<?php echo $acc['type']; ?>', '<?php echo htmlspecialchars(addslashes($acc['account_number'] ?? '')); ?>')"><i
+                                class="fas fa-edit"></i></button>
+                        <button class="btn btn-sm btn-ghost text-danger" onclick="deleteAccount(<?php echo $acc['id']; ?>)"><i
+                                class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            </div>
+        <?php endforeach; ?>
+    <?php endif; ?>
+</div>
+
+<!-- Add/Edit Account Modal -->
+<div class="modal-overlay" id="addAccountModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title" id="accountModalTitle">Add Account</h3><button class="modal-close"><i
+                    class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <form id="accountForm">
+                <input type="hidden" id="accountId" name="id" value="">
+                <?php if ($user['role'] === ROLE_SUPERADMIN && !empty($branches)): ?>
+                    <div class="form-group">
+                        <label class="form-label required">Branch</label>
+                        <select name="branch_id" class="form-control" required>
+                            <option value="">Select Branch</option>
+                            <?php foreach ($branches as $br): ?>
+                                <option value="<?php echo $br['id']; ?>">
+                                    <?php echo htmlspecialchars($br['name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                <?php endif; ?>
+                <div class="form-group"><label class="form-label required">Account Name</label><input type="text"
+                        name="name" class="form-control" placeholder="e.g. Main Bank Account" required></div>
+                <div class="form-group">
+                    <label class="form-label required">Type</label>
+                    <select name="type" class="form-control" required>
+                        <option value="bank">Bank Account</option>
+                        <option value="petty_cash">Petty Cash</option>
+                    </select>
+                </div>
+                <div class="form-group"><label class="form-label">Account Number</label><input type="text"
+                        name="account_number" class="form-control" placeholder="Optional"></div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="KiTAcc.closeModal('addAccountModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="submitAccount()"><i class="fas fa-save"></i> Save</button>
+        </div>
+    </div>
+</div>
+
+<?php
+$page_scripts = <<<'SCRIPT'
+<script>
+    function submitAccount() {
+        const form = document.getElementById('accountForm');
+        const data = KiTAcc.serializeForm(form);
+        data.action = data.id ? 'update' : 'create';
+        KiTAcc.post('api/accounts.php', data, function(res) {
+            if (res.success) { KiTAcc.toast('Account saved!', 'success'); setTimeout(() => location.reload(), 600); }
+            else KiTAcc.toast(res.message || 'Error.', 'error');
+        });
+    }
+    function editAccount(id, name, type, accNum) {
+        document.getElementById('accountId').value = id;
+        document.getElementById('accountModalTitle').textContent = 'Edit Account';
+        const form = document.getElementById('accountForm');
+        form.querySelector('[name="name"]').value = name;
+        form.querySelector('[name="type"]').value = type;
+        form.querySelector('[name="account_number"]').value = accNum;
+        KiTAcc.openModal('addAccountModal');
+    }
+    function deleteAccount(id) {
+        if (!KiTAcc.confirm('Delete this account? This cannot be undone.')) return;
+        KiTAcc.post('api/accounts.php', { action: 'delete', id: id }, function(res) {
+            if (res.success) { KiTAcc.toast('Deleted.', 'success'); setTimeout(() => location.reload(), 600); }
+            else KiTAcc.toast(res.message || 'Error.', 'error');
+        });
+    }
+</script>
+SCRIPT;
+include __DIR__ . '/includes/footer.php';
+?>
