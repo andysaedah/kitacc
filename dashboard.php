@@ -147,9 +147,9 @@ include __DIR__ . '/includes/header.php';
 ?>
 
 <!-- Page Header -->
-<div class="d-flex justify-between align-center mb-6 flex-wrap gap-4">
+<div class="page-header d-flex justify-between align-center mb-6 flex-wrap gap-4">
     <div>
-        <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--gray-800); margin-bottom: 0.25rem;">
+        <h1 class="page-title">
             Shalom, <?php echo htmlspecialchars($user['name']); ?>!
         </h1>
         <p class="text-muted">
