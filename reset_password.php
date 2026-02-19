@@ -131,8 +131,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isAjax()) {
                         <label for="new_password" class="form-label">New Password</label>
                         <div class="input-group">
                             <i class="fas fa-lock input-group-icon"></i>
-                            <input type="password" id="new_password" name="new_password" class="form-control has-icon-left"
+                            <input type="password" id="new_password" name="new_password" class="form-control has-icon-left has-icon-right"
                                 placeholder="Min 8 characters" required minlength="8">
+                            <button type="button" class="input-group-icon-right toggle-password">
+                                <i class="fas fa-eye"></i>
+                            </button>
                         </div>
                     </div>
 
@@ -141,7 +144,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isAjax()) {
                         <div class="input-group">
                             <i class="fas fa-lock input-group-icon"></i>
                             <input type="password" id="confirm_password" name="confirm_password"
-                                class="form-control has-icon-left" placeholder="Re-enter password" required minlength="8">
+                                class="form-control has-icon-left has-icon-right" placeholder="Re-enter password" required minlength="8">
+                            <button type="button" class="input-group-icon-right toggle-password">
+                                <i class="fas fa-eye"></i>
+                            </button>
                         </div>
                     </div>
 

@@ -172,7 +172,12 @@ include __DIR__ . '/includes/header.php';
                 </div>
                 <div class="form-group" id="passwordField">
                     <label class="form-label required">Password</label>
-                    <input type="password" name="password" class="form-control" minlength="8">
+                    <div class="input-group">
+                        <input type="password" name="password" class="form-control has-icon-right" minlength="8">
+                        <button type="button" class="input-group-icon-right toggle-password">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
                     <span class="form-help">Min 8 characters. Leave blank when editing to keep current password.</span>
                 </div>
             </form>

@@ -94,16 +94,31 @@ include __DIR__ . '/includes/header.php';
                 <form id="passwordForm">
                     <div class="form-group">
                         <label class="form-label required">Current Password</label>
-                        <input type="password" name="current_password" class="form-control" required>
+                        <div class="input-group">
+                            <input type="password" name="current_password" class="form-control has-icon-right" required>
+                            <button type="button" class="input-group-icon-right toggle-password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label class="form-label required">New Password</label>
-                        <input type="password" name="new_password" class="form-control" minlength="8" required>
+                        <div class="input-group">
+                            <input type="password" name="new_password" class="form-control has-icon-right" minlength="8" required>
+                            <button type="button" class="input-group-icon-right toggle-password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
                         <span class="form-help">Minimum 8 characters</span>
                     </div>
                     <div class="form-group">
                         <label class="form-label required">Confirm Password</label>
-                        <input type="password" name="confirm_password" class="form-control" required>
+                        <div class="input-group">
+                            <input type="password" name="confirm_password" class="form-control has-icon-right" required>
+                            <button type="button" class="input-group-icon-right toggle-password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
                     </div>
                     <button type="button" class="btn btn-primary" onclick="changePassword()">
                         <i class="fas fa-lock"></i> Change Password
