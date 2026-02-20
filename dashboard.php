@@ -56,8 +56,16 @@ try {
     $incomeTotal = (float) ($totals['income'] ?? 0);
     $expenseTotal = (float) ($totals['expense'] ?? 0);
 
-    // ---- Net Balance ----
-    $netBalance = $incomeTotal - $expenseTotal;
+    // ---- Total Account Balance ----
+    $sql = "SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE is_active = 1";
+    $params = [];
+    if ($branchId !== null) {
+        $sql .= " AND branch_id = ?";
+        $params[] = $branchId;
+    }
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $totalBalance = (float) $stmt->fetchColumn();
 
     // ---- Pending Claims ----
     $sql = "SELECT COUNT(*) FROM claims WHERE status = 'pending'";
@@ -136,7 +144,7 @@ try {
 } catch (Exception $e) {
     $incomeTotal = 0;
     $expenseTotal = 0;
-    $netBalance = 0;
+    $totalBalance = 0;
     $pendingClaims = 0;
     $recentTransactions = [];
     $chartData = [];
@@ -204,15 +212,15 @@ include __DIR__ . '/includes/header.php';
         </div>
     </div>
 
-    <!-- Net Balance -->
+    <!-- Total Balance -->
     <div class="stat-card">
         <div class="stat-icon primary">
             <i class="fas fa-wallet"></i>
         </div>
         <div class="stat-content">
-            <div class="stat-label">Net Balance</div>
-            <div class="stat-value" data-counter="<?php echo $netBalance; ?>" data-prefix="RM " data-decimals="2">
-                <?php echo formatCurrency($netBalance); ?>
+            <div class="stat-label">Total Balance</div>
+            <div class="stat-value" data-counter="<?php echo $totalBalance; ?>" data-prefix="RM " data-decimals="2">
+                <?php echo formatCurrency($totalBalance); ?>
             </div>
         </div>
     </div>
