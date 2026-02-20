@@ -102,6 +102,18 @@ function actionBadge(string $action): string
         'change_password' => 'badge-warning',
         'transfer' => 'badge-primary',
         'delete_transfer' => 'badge-danger',
+        // Account actions
+        'account_created' => 'badge-primary',
+        'account_updated' => 'badge-warning',
+        'account_deleted' => 'badge-danger',
+        'account_activated' => 'badge-success',
+        'account_deactivated' => 'badge-danger',
+        // Fund actions
+        'fund_created' => 'badge-primary',
+        'fund_updated' => 'badge-warning',
+        'fund_deleted' => 'badge-danger',
+        'fund_transfer' => 'badge-primary',
+        'fund_transfer_deleted' => 'badge-danger',
     ];
     return $map[$action] ?? 'badge-secondary';
 }

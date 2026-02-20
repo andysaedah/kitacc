@@ -14,6 +14,19 @@ try {
     $action = $_POST['action'] ?? '';
     validateCsrf();
 
+    // Helper: fetch account snapshot for audit
+    $getAccountSnapshot = function ($id) use ($pdo) {
+        $s = $pdo->prepare("SELECT a.id, a.name, a.account_number, a.balance, a.is_active, a.is_default,
+                                   a.branch_id, b.name AS branch_name,
+                                   a.account_type_id, at.name AS account_type
+                            FROM accounts a
+                            LEFT JOIN branches b ON a.branch_id = b.id
+                            LEFT JOIN account_types at ON a.account_type_id = at.id
+                            WHERE a.id = ?");
+        $s->execute([$id]);
+        return $s->fetch(PDO::FETCH_ASSOC) ?: null;
+    };
+
     switch ($action) {
         case 'create':
             if ($user['role'] !== ROLE_SUPERADMIN)
@@ -32,7 +45,9 @@ try {
 
             $pdo->prepare("INSERT INTO accounts (branch_id, name, account_type_id, account_number, balance) VALUES (?, ?, ?, ?, ?)")
                 ->execute([$targetBranch, $name, $accountTypeId, $accountNumber, $balance]);
-            auditLog('account_created', 'accounts', $pdo->lastInsertId());
+            $newId = $pdo->lastInsertId();
+            $newSnap = $getAccountSnapshot($newId);
+            auditLog('account_created', 'accounts', $newId, null, $newSnap);
             echo json_encode(['success' => true, 'message' => 'Account created.']);
             break;
 
@@ -41,6 +56,12 @@ try {
             $name = trim($_POST['name'] ?? '');
             if (!$name)
                 throw new Exception('Name is required.');
+
+            // Capture old state before update
+            $oldSnap = $getAccountSnapshot($id);
+            if (!$oldSnap)
+                throw new Exception('Account not found.');
+
             if ($user['role'] === ROLE_SUPERADMIN) {
                 $accountTypeId = intval($_POST['account_type_id'] ?? 0);
                 if (!$accountTypeId)
@@ -68,7 +89,9 @@ try {
                 // Non-superadmin cannot edit accounts
                 throw new Exception('Only superadmin can edit accounts.');
             }
-            auditLog('account_updated', 'accounts', $id);
+
+            $newSnap = $getAccountSnapshot($id);
+            auditLog('account_updated', 'accounts', $id, $oldSnap, $newSnap);
             echo json_encode(['success' => true, 'message' => 'Account updated.']);
             break;
 
@@ -76,11 +99,13 @@ try {
             if ($user['role'] !== ROLE_SUPERADMIN)
                 throw new Exception('Only superadmin can delete accounts.');
             $id = intval($_POST['id'] ?? 0);
-            // Cannot delete default account
-            $chkDefault = $pdo->prepare("SELECT is_default FROM accounts WHERE id = ?");
-            $chkDefault->execute([$id]);
-            $accRow = $chkDefault->fetch();
-            if ($accRow && $accRow['is_default'])
+
+            // Capture old state before delete
+            $oldSnap = $getAccountSnapshot($id);
+            if (!$oldSnap)
+                throw new Exception('Account not found.');
+
+            if ($oldSnap['is_default'])
                 throw new Exception('Cannot delete the default account.');
             // Check if account has transactions
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM transactions WHERE account_id = ?");
@@ -88,7 +113,7 @@ try {
             if ($stmt->fetchColumn() > 0)
                 throw new Exception('Cannot delete account with existing transactions.');
             $pdo->prepare("DELETE FROM accounts WHERE id = ?")->execute([$id]);
-            auditLog('account_deleted', 'accounts', $id);
+            auditLog('account_deleted', 'accounts', $id, $oldSnap, null);
             echo json_encode(['success' => true, 'message' => 'Account deleted.']);
             break;
 
@@ -96,20 +121,19 @@ try {
             $id = intval($_POST['id'] ?? 0);
             $isActive = intval($_POST['is_active'] ?? 0);
 
-            // Check if this is a default account — cannot deactivate
-            $chkDefault = $pdo->prepare("SELECT is_default, branch_id FROM accounts WHERE id = ?");
-            $chkDefault->execute([$id]);
-            $accRow = $chkDefault->fetch();
-            if (!$accRow)
+            // Capture old state
+            $oldSnap = $getAccountSnapshot($id);
+            if (!$oldSnap)
                 throw new Exception('Account not found.');
-            if ($accRow['is_default'] && !$isActive)
+            if ($oldSnap['is_default'] && !$isActive)
                 throw new Exception('Cannot deactivate the default account. It must always remain active.');
             // Verify ownership for non-superadmin
-            if ($user['role'] !== ROLE_SUPERADMIN && (int) $accRow['branch_id'] !== (int) $branchId)
+            if ($user['role'] !== ROLE_SUPERADMIN && (int) $oldSnap['branch_id'] !== (int) $branchId)
                 throw new Exception('Access denied.');
 
             $pdo->prepare("UPDATE accounts SET is_active = ? WHERE id = ?")->execute([$isActive, $id]);
-            auditLog($isActive ? 'account_activated' : 'account_deactivated', 'accounts', $id);
+            $newSnap = $getAccountSnapshot($id);
+            auditLog($isActive ? 'account_activated' : 'account_deactivated', 'accounts', $id, $oldSnap, $newSnap);
             echo json_encode(['success' => true, 'message' => $isActive ? 'Account activated.' : 'Account deactivated.']);
             break;
 
