@@ -114,6 +114,12 @@ function actionBadge(string $action): string
         'fund_deleted' => 'badge-danger',
         'fund_transfer' => 'badge-primary',
         'fund_transfer_deleted' => 'badge-danger',
+        // Claim actions
+        'claim_submitted' => 'badge-primary',
+        'claim_updated' => 'badge-warning',
+        'claim_approved' => 'badge-success',
+        'claim_rejected' => 'badge-danger',
+        'claim_deleted' => 'badge-danger',
     ];
     return $map[$action] ?? 'badge-secondary';
 }

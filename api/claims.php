@@ -13,6 +13,34 @@ try {
     $user = getCurrentUser();
     $branchId = $user['branch_id'];
 
+    // Helper: build a human-readable claim snapshot
+    $getClaimSnapshot = function ($row) use ($pdo) {
+        if (!$row) return null;
+        $cat = null;
+        if (!empty($row['category_id'])) {
+            $c = $pdo->prepare("SELECT name FROM categories WHERE id = ?");
+            $c->execute([$row['category_id']]);
+            $cat = $c->fetchColumn() ?: null;
+        }
+        $submitter = null;
+        if (!empty($row['submitted_by'])) {
+            $u = $pdo->prepare("SELECT name FROM users WHERE id = ?");
+            $u->execute([$row['submitted_by']]);
+            $submitter = $u->fetchColumn() ?: null;
+        }
+        return [
+            'id' => $row['id'] ?? null,
+            'title' => $row['title'] ?? '',
+            'amount' => $row['amount'],
+            'receipt_date' => $row['receipt_date'] ?? '',
+            'category' => $cat,
+            'description' => $row['description'] ?? '',
+            'status' => $row['status'] ?? 'pending',
+            'submitted_by' => $submitter,
+            'receipt_path' => $row['receipt_path'] ?? null,
+        ];
+    };
+
     switch ($action) {
 
         case 'get':
@@ -55,10 +83,15 @@ try {
                 $receiptPath = handleUpload($_FILES['receipt'], 'uploads/claims');
             }
 
+            $oldSnap = $getClaimSnapshot($claim);
+
             $pdo->prepare("UPDATE claims SET title = ?, amount = ?, receipt_date = ?, category_id = ?, description = ?, receipt_path = ? WHERE id = ?")
                 ->execute([$title, $amount, $receiptDate, $categoryId, $description, $receiptPath, $id]);
 
-            auditLog('claim_updated', 'claims', $id, "Amount: $amount");
+            $updatedStmt = $pdo->prepare("SELECT * FROM claims WHERE id = ?");
+            $updatedStmt->execute([$id]);
+            $newSnap = $getClaimSnapshot($updatedStmt->fetch());
+            auditLog('claim_updated', 'claims', $id, $oldSnap, $newSnap);
             echo json_encode(['success' => true, 'message' => 'Claim updated.']);
             break;
 
@@ -87,7 +120,11 @@ try {
             $stmt = $pdo->prepare("INSERT INTO claims (branch_id, submitted_by, title, amount, category_id, description, receipt_path, receipt_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([$branchId, $user['id'], $title, $amount, $categoryId, $description, $receiptPath, $receiptDate]);
 
-            auditLog('claim_submitted', 'claims', $pdo->lastInsertId(), "Amount: $amount");
+            $newId = $pdo->lastInsertId();
+            $newClaimStmt = $pdo->prepare("SELECT * FROM claims WHERE id = ?");
+            $newClaimStmt->execute([$newId]);
+            $newSnap = $getClaimSnapshot($newClaimStmt->fetch());
+            auditLog('claim_submitted', 'claims', $newId, null, $newSnap);
             echo json_encode(['success' => true, 'message' => 'Claim submitted for review.']);
             break;
 
@@ -142,7 +179,17 @@ try {
             // Update account balance
             $pdo->prepare("UPDATE accounts SET balance = balance - ? WHERE id = ?")->execute([$claim['amount'], $accountId]);
 
-            auditLog('claim_approved', 'claims', $id, "Amount: {$claim['amount']}");
+            $oldSnap = $getClaimSnapshot($claim);
+            $approvedStmt = $pdo->prepare("SELECT * FROM claims WHERE id = ?");
+            $approvedStmt->execute([$id]);
+            $newSnap = $getClaimSnapshot($approvedStmt->fetch());
+            $newSnap['approved_by'] = $user['name'];
+            $newSnap['paid_from_account'] = (function() use ($pdo, $accountId) {
+                $s = $pdo->prepare("SELECT name FROM accounts WHERE id = ?");
+                $s->execute([$accountId]);
+                return $s->fetchColumn() ?: ('ID:' . $accountId);
+            })();
+            auditLog('claim_approved', 'claims', $id, $oldSnap, $newSnap);
             echo json_encode(['success' => true, 'message' => 'Claim approved. Expense recorded.']);
             break;
 
@@ -164,10 +211,17 @@ try {
             if ($user['role'] !== ROLE_SUPERADMIN && $claim['branch_id'] != $branchId)
                 throw new Exception('Claim not found or already processed.');
 
+            $oldSnap = $getClaimSnapshot($claim);
+
             $pdo->prepare("UPDATE claims SET status = 'rejected', rejection_reason = ?, approved_by = ?, approved_at = NOW() WHERE id = ?")
                 ->execute([$reason, $user['id'], $id]);
 
-            auditLog('claim_rejected', 'claims', $id, "Reason: $reason");
+            $rejectedStmt = $pdo->prepare("SELECT * FROM claims WHERE id = ?");
+            $rejectedStmt->execute([$id]);
+            $newSnap = $getClaimSnapshot($rejectedStmt->fetch());
+            $newSnap['rejected_by'] = $user['name'];
+            $newSnap['rejection_reason'] = $reason;
+            auditLog('claim_rejected', 'claims', $id, $oldSnap, $newSnap);
             echo json_encode(['success' => true, 'message' => 'Claim rejected.']);
             break;
 
@@ -183,9 +237,10 @@ try {
             if (!$claim)
                 throw new Exception('Claim not found or cannot be deleted.');
 
+            $oldSnap = $getClaimSnapshot($claim);
             $pdo->prepare("DELETE FROM claims WHERE id = ?")->execute([$id]);
 
-            auditLog('claim_deleted', 'claims', $id, "Amount: {$claim['amount']}");
+            auditLog('claim_deleted', 'claims', $id, $oldSnap, null);
             echo json_encode(['success' => true, 'message' => 'Claim deleted.']);
             break;
 

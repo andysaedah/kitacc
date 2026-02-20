@@ -15,6 +15,33 @@ try {
     $user = getCurrentUser();
     $branchId = getActiveBranchId() ?? $user['branch_id'];
 
+    // Helper: build a human-readable transaction snapshot
+    $getTxnSnapshot = function ($row) use ($pdo) {
+        // Accept a row array (from SELECT *) and resolve names
+        if (!$row) return null;
+        $acct = $pdo->prepare("SELECT name FROM accounts WHERE id = ?");
+        $acct->execute([$row['account_id']]);
+        $cat = $pdo->prepare("SELECT name FROM categories WHERE id = ?");
+        $cat->execute([$row['category_id']]);
+        $fund = null;
+        if (!empty($row['fund_id'])) {
+            $f = $pdo->prepare("SELECT name FROM funds WHERE id = ?");
+            $f->execute([$row['fund_id']]);
+            $fund = $f->fetchColumn() ?: null;
+        }
+        return [
+            'id' => $row['id'] ?? null,
+            'type' => $row['type'],
+            'date' => $row['date'],
+            'amount' => $row['amount'],
+            'account' => $acct->fetchColumn() ?: ('ID:' . $row['account_id']),
+            'category' => $cat->fetchColumn() ?: ('ID:' . $row['category_id']),
+            'fund' => $fund,
+            'description' => $row['description'] ?? '',
+            'reference_number' => $row['reference_number'] ?? '',
+        ];
+    };
+
     switch ($action) {
 
         case 'create':
@@ -58,13 +85,13 @@ try {
             $balanceChange = $type === 'income' ? $amount : -$amount;
             $pdo->prepare("UPDATE accounts SET balance = balance + ? WHERE id = ?")->execute([$balanceChange, $accountId]);
 
-            auditLog($type . '_created', 'transaction', $pdo->lastInsertId(), null, [
-                'type' => $type,
-                'amount' => $amount,
-                'date' => $date,
-                'description' => $description,
-                'reference' => $referenceNumber
+            $newId = $pdo->lastInsertId();
+            $newSnap = $getTxnSnapshot([
+                'id' => $newId, 'type' => $type, 'date' => $date, 'amount' => $amount,
+                'account_id' => $accountId, 'category_id' => $categoryId, 'fund_id' => $fundId,
+                'description' => $description, 'reference_number' => $referenceNumber
             ]);
+            auditLog($type . '_created', 'transactions', $newId, null, $newSnap);
             echo json_encode(['success' => true, 'message' => ucfirst($type) . ' recorded successfully.']);
             break;
 
@@ -128,13 +155,13 @@ try {
             $newChange = $old['type'] === 'income' ? $amount : -$amount;
             $pdo->prepare("UPDATE accounts SET balance = balance + ? WHERE id = ?")->execute([$newChange, $accountId]);
 
-            auditLog(
-                'transaction_updated',
-                'transaction',
-                $id,
-                ['date' => $old['date'], 'amount' => $old['amount'], 'description' => $old['description'], 'reference' => $old['reference_number'], 'account_id' => $old['account_id'], 'category_id' => $old['category_id'], 'fund_id' => $old['fund_id']],
-                ['date' => $_POST['date'], 'amount' => $amount, 'description' => trim($_POST['description'] ?? ''), 'reference' => trim($_POST['reference_number'] ?? ''), 'account_id' => $accountId, 'category_id' => $categoryId, 'fund_id' => $fundId]
-            );
+            $oldSnap = $getTxnSnapshot($old);
+            $newSnap = $getTxnSnapshot([
+                'id' => $id, 'type' => $old['type'], 'date' => $_POST['date'], 'amount' => $amount,
+                'account_id' => $accountId, 'category_id' => $categoryId, 'fund_id' => $fundId,
+                'description' => trim($_POST['description'] ?? ''), 'reference_number' => trim($_POST['reference_number'] ?? '')
+            ]);
+            auditLog('transaction_updated', 'transactions', $id, $oldSnap, $newSnap);
             echo json_encode(['success' => true, 'message' => 'Transaction updated.']);
             break;
 
@@ -158,13 +185,9 @@ try {
             $change = $txn['type'] === 'income' ? -$txn['amount'] : $txn['amount'];
             $pdo->prepare("UPDATE accounts SET balance = balance + ? WHERE id = ?")->execute([$change, $txn['account_id']]);
 
+            $oldSnap = $getTxnSnapshot($txn);
             $pdo->prepare("DELETE FROM transactions WHERE id = ?")->execute([$id]);
-            auditLog(
-                'transaction_deleted',
-                'transaction',
-                $id,
-                ['type' => $txn['type'], 'amount' => $txn['amount'], 'date' => $txn['date'], 'description' => $txn['description'], 'reference' => $txn['reference_number']]
-            );
+            auditLog('transaction_deleted', 'transactions', $id, $oldSnap, null);
             echo json_encode(['success' => true, 'message' => 'Transaction deleted.']);
             break;
 
