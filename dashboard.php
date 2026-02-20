@@ -2,10 +2,11 @@
 /**
  * KiTAcc - Dashboard
  * Overview stats, charts, and recent transactions
- * Accessible by all roles
+ * Accessible by branch_finance and above
  */
 require_once __DIR__ . '/includes/config.php';
 requireLogin();
+requireRole(ROLE_BRANCH_FINANCE);
 
 $user = getCurrentUser();
 $branchId = getActiveBranchId();
