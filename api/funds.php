@@ -67,9 +67,14 @@ try {
             if ($amount <= 0)
                 throw new Exception('Amount must be greater than zero.');
 
-            // Verify both funds exist
-            $stmt = $pdo->prepare("SELECT id FROM funds WHERE id IN (?, ?) AND is_active = 1");
-            $stmt->execute([$fromFundId, $toFundId]);
+            // Verify both funds exist and belong to user's branch
+            if ($user['role'] !== ROLE_SUPERADMIN) {
+                $stmt = $pdo->prepare("SELECT id FROM funds WHERE id IN (?, ?) AND is_active = 1 AND branch_id = ?");
+                $stmt->execute([$fromFundId, $toFundId, $branchId]);
+            } else {
+                $stmt = $pdo->prepare("SELECT id FROM funds WHERE id IN (?, ?) AND is_active = 1");
+                $stmt->execute([$fromFundId, $toFundId]);
+            }
             if ($stmt->rowCount() < 2)
                 throw new Exception('One or both funds not found.');
 

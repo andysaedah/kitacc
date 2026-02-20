@@ -16,38 +16,49 @@ try {
 
     switch ($action) {
         case 'create':
+            if ($user['role'] !== ROLE_SUPERADMIN)
+                throw new Exception('Only superadmin can create accounts.');
             $name = trim($_POST['name'] ?? '');
             $accountNumber = trim($_POST['account_number'] ?? '');
             $accountTypeId = intval($_POST['account_type_id'] ?? 0);
-            $targetBranch = ($user['role'] === ROLE_SUPERADMIN && !empty($_POST['branch_id'])) ? intval($_POST['branch_id']) : $branchId;
+            $balance = floatval($_POST['balance'] ?? 0);
+            $targetBranch = !empty($_POST['branch_id']) ? intval($_POST['branch_id']) : $branchId;
             if (!$name)
                 throw new Exception('Name is required.');
             if (!$accountTypeId)
                 throw new Exception('Account type is required.');
+            if ($balance < 0)
+                throw new Exception('Starting balance cannot be negative.');
 
-            $pdo->prepare("INSERT INTO accounts (branch_id, name, account_type_id, account_number) VALUES (?, ?, ?, ?)")
-                ->execute([$targetBranch, $name, $accountTypeId, $accountNumber]);
+            $pdo->prepare("INSERT INTO accounts (branch_id, name, account_type_id, account_number, balance) VALUES (?, ?, ?, ?, ?)")
+                ->execute([$targetBranch, $name, $accountTypeId, $accountNumber, $balance]);
             auditLog('account_created', 'accounts', $pdo->lastInsertId());
             echo json_encode(['success' => true, 'message' => 'Account created.']);
             break;
 
         case 'update':
             $id = intval($_POST['id'] ?? 0);
-            $accountTypeId = intval($_POST['account_type_id'] ?? 0);
-            if (!$accountTypeId)
-                throw new Exception('Account type is required.');
+            $name = trim($_POST['name'] ?? '');
+            if (!$name)
+                throw new Exception('Name is required.');
             if ($user['role'] === ROLE_SUPERADMIN) {
+                $accountTypeId = intval($_POST['account_type_id'] ?? 0);
+                if (!$accountTypeId)
+                    throw new Exception('Account type is required.');
                 $pdo->prepare("UPDATE accounts SET name = ?, account_number = ?, account_type_id = ? WHERE id = ?")
-                    ->execute([trim($_POST['name']), trim($_POST['account_number'] ?? ''), $accountTypeId, $id]);
+                    ->execute([$name, trim($_POST['account_number'] ?? ''), $accountTypeId, $id]);
             } else {
-                $pdo->prepare("UPDATE accounts SET name = ?, account_number = ?, account_type_id = ? WHERE id = ? AND branch_id = ?")
-                    ->execute([trim($_POST['name']), trim($_POST['account_number'] ?? ''), $accountTypeId, $id, $branchId]);
+                // Non-superadmin can only rename
+                $pdo->prepare("UPDATE accounts SET name = ? WHERE id = ? AND branch_id = ?")
+                    ->execute([$name, $id, $branchId]);
             }
             auditLog('account_updated', 'accounts', $id);
             echo json_encode(['success' => true, 'message' => 'Account updated.']);
             break;
 
         case 'delete':
+            if ($user['role'] !== ROLE_SUPERADMIN)
+                throw new Exception('Only superadmin can delete accounts.');
             $id = intval($_POST['id'] ?? 0);
             // Cannot delete default account
             $chkDefault = $pdo->prepare("SELECT is_default FROM accounts WHERE id = ?");
@@ -55,13 +66,6 @@ try {
             $accRow = $chkDefault->fetch();
             if ($accRow && $accRow['is_default'])
                 throw new Exception('Cannot delete the default account.');
-            // Verify ownership
-            if ($user['role'] !== ROLE_SUPERADMIN) {
-                $chk = $pdo->prepare("SELECT COUNT(*) FROM accounts WHERE id = ? AND branch_id = ?");
-                $chk->execute([$id, $branchId]);
-                if ($chk->fetchColumn() == 0)
-                    throw new Exception('Account not found.');
-            }
             // Check if account has transactions
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM transactions WHERE account_id = ?");
             $stmt->execute([$id]);

@@ -58,8 +58,9 @@ include __DIR__ . '/includes/header.php';
         <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--gray-800);">Accounts</h1>
         <p class="text-muted">Manage bank accounts and petty cash</p>
     </div>
-    <button class="btn btn-primary" onclick="KiTAcc.openModal('addAccountModal')"><i class="fas fa-plus"></i> Add
-        Account</button>
+    <?php if ($user['role'] === ROLE_SUPERADMIN): ?>
+        <button class="btn btn-primary" onclick="openAddAccount()"><i class="fas fa-plus"></i> Add Account</button>
+    <?php endif; ?>
 </div>
 
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -110,7 +111,7 @@ include __DIR__ . '/includes/header.php';
                             <button class="btn btn-sm btn-ghost"
                                 onclick="editAccount(<?php echo $acc['id']; ?>, '<?php echo htmlspecialchars(addslashes($acc['name'])); ?>', '<?php echo htmlspecialchars(addslashes($acc['account_number'] ?? '')); ?>', '<?php echo $acc['account_type_id'] ?? ''; ?>')"><i
                                     class="fas fa-edit"></i></button>
-                            <?php if (!$acc['is_default']): ?>
+                            <?php if ($user['role'] === ROLE_SUPERADMIN && !$acc['is_default']): ?>
                                 <button class="btn btn-sm btn-ghost text-danger" onclick="deleteAccount(<?php echo $acc['id']; ?>)"><i
                                         class="fas fa-trash"></i></button>
                             <?php endif; ?>
@@ -126,41 +127,49 @@ include __DIR__ . '/includes/header.php';
 <div class="modal-overlay" id="addAccountModal">
     <div class="modal">
         <div class="modal-header">
-            <h3 class="modal-title" id="accountModalTitle">Add Account</h3><button class="modal-close"><i
-                    class="fas fa-times"></i></button>
+            <h3 class="modal-title" id="accountModalTitle"><?php echo $user['role'] === ROLE_SUPERADMIN ? 'Add Account' : 'Rename Account'; ?></h3>
+            <button class="modal-close"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-body">
             <form id="accountForm">
                 <input type="hidden" id="accountId" name="id" value="">
-                <?php if ($user['role'] === ROLE_SUPERADMIN && !empty($branches)): ?>
-                    <div class="form-group">
-                        <label class="form-label required">Branch</label>
-                        <select name="branch_id" class="form-control" required>
-                            <option value="">Select Branch</option>
-                            <?php foreach ($branches as $br): ?>
-                                <option value="<?php echo $br['id']; ?>">
-                                    <?php echo htmlspecialchars($br['name']); ?>
-                                </option>
+                <?php if ($user['role'] === ROLE_SUPERADMIN): ?>
+                    <?php if (!empty($branches)): ?>
+                        <div class="form-group" id="branchGroup">
+                            <label class="form-label required">Branch</label>
+                            <select name="branch_id" class="form-control" required>
+                                <option value="">Select Branch</option>
+                                <?php foreach ($branches as $br): ?>
+                                    <option value="<?php echo $br['id']; ?>"><?php echo htmlspecialchars($br['name']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    <?php endif; ?>
+                <?php endif; ?>
+                <div class="form-group">
+                    <label class="form-label required">Account Name</label>
+                    <input type="text" name="name" class="form-control" placeholder="e.g. Main Bank Account" required>
+                </div>
+                <?php if ($user['role'] === ROLE_SUPERADMIN): ?>
+                    <div class="form-group" id="accountTypeGroup">
+                        <label class="form-label required">Account Type</label>
+                        <select name="account_type_id" class="form-control" required>
+                            <option value="">Select Account Type</option>
+                            <?php foreach ($accountTypes as $at): ?>
+                                <option value="<?php echo $at['id']; ?>"><?php echo htmlspecialchars($at['name']); ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
+                    <div class="form-group" id="accountNumberGroup">
+                        <label class="form-label">Account Number</label>
+                        <input type="text" name="account_number" class="form-control" placeholder="Optional">
+                    </div>
+                    <div class="form-group" id="startingBalanceGroup">
+                        <label class="form-label">Starting Balance (<?php echo getSetting('currency_symbol', 'RM'); ?>)</label>
+                        <input type="number" name="balance" class="form-control" step="0.01" min="0" value="0.00" placeholder="0.00">
+                        <span class="form-help">Set the initial account balance (e.g. 2000.00). Only applies when creating.</span>
+                    </div>
                 <?php endif; ?>
-                <div class="form-group"><label class="form-label required">Account Name</label><input type="text"
-                        name="name" class="form-control" placeholder="e.g. Main Bank Account" required></div>
-                <div class="form-group">
-                    <label class="form-label required">Account Type</label>
-                    <select name="account_type_id" class="form-control" required>
-                        <option value="">Select Account Type</option>
-                        <?php foreach ($accountTypes as $at): ?>
-                            <option value="<?php echo $at['id']; ?>">
-                                <?php echo htmlspecialchars($at['name']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <span class="form-help">Managed by superadmin in Account Types settings.</span>
-                </div>
-                <div class="form-group"><label class="form-label">Account Number</label><input type="text"
-                        name="account_number" class="form-control" placeholder="Optional"></div>
             </form>
         </div>
         <div class="modal-footer">
@@ -171,8 +180,18 @@ include __DIR__ . '/includes/header.php';
 </div>
 
 <?php
-$page_scripts = <<<'SCRIPT'
+$isSuperadmin = $user['role'] === ROLE_SUPERADMIN ? 'true' : 'false';
+$page_scripts = "<script>var IS_SUPERADMIN = {$isSuperadmin};</script>";
+$page_scripts .= <<<'SCRIPT'
 <script>
+    function openAddAccount() {
+        document.getElementById('accountId').value = '';
+        document.getElementById('accountModalTitle').textContent = 'Add Account';
+        document.getElementById('accountForm').reset();
+        var balGroup = document.getElementById('startingBalanceGroup');
+        if (balGroup) balGroup.style.display = '';
+        KiTAcc.openModal('addAccountModal');
+    }
     function submitAccount() {
         const form = document.getElementById('accountForm');
         const data = KiTAcc.serializeForm(form);
@@ -184,11 +203,18 @@ $page_scripts = <<<'SCRIPT'
     }
     function editAccount(id, name, accNum, accountTypeId) {
         document.getElementById('accountId').value = id;
-        document.getElementById('accountModalTitle').textContent = 'Edit Account';
-        const form = document.getElementById('accountForm');
+        document.getElementById('accountModalTitle').textContent = IS_SUPERADMIN ? 'Edit Account' : 'Rename Account';
+        var form = document.getElementById('accountForm');
         form.querySelector('[name="name"]').value = name;
-        form.querySelector('[name="account_number"]').value = accNum;
-        form.querySelector('[name="account_type_id"]').value = accountTypeId || '';
+        if (IS_SUPERADMIN) {
+            var accNumField = form.querySelector('[name="account_number"]');
+            if (accNumField) accNumField.value = accNum;
+            var typeField = form.querySelector('[name="account_type_id"]');
+            if (typeField) typeField.value = accountTypeId || '';
+            // Hide starting balance when editing
+            var balGroup = document.getElementById('startingBalanceGroup');
+            if (balGroup) balGroup.style.display = 'none';
+        }
         KiTAcc.openModal('addAccountModal');
     }
     function deleteAccount(id) {
@@ -199,12 +225,11 @@ $page_scripts = <<<'SCRIPT'
         });
     }
     function toggleAccountActive(id, isActive, el) {
-        const card = el.closest('.stat-card');
+        var card = el.closest('.stat-card');
         KiTAcc.post('api/accounts.php', { action: 'toggle_active', id: id, is_active: isActive ? 1 : 0 }, function(res) {
             if (res.success) {
                 KiTAcc.toast(isActive ? 'Account activated.' : 'Account deactivated.', 'success');
                 card.style.opacity = isActive ? '1' : '0.5';
-                // Update badge display
                 setTimeout(() => location.reload(), 600);
             } else {
                 KiTAcc.toast(res.message || 'Error.', 'error');

@@ -64,4 +64,5 @@ INSERT INTO `account_types` (`name`, `description`, `icon`, `color`) VALUES
 ('Petty Cash', 'Small cash fund for minor expenses', 'fa-coins', 'secondary');
 
 INSERT INTO `accounts` (`branch_id`, `name`, `account_type_id`, `account_number`, `balance`, `is_default`) VALUES
-(1, 'Main Bank Account', 1, '', 0.00, 1);
+(1, 'Main Bank Account', 1, '', 0.00, 1),
+(1, 'Petty Cash', 2, '', 0.00, 0);
