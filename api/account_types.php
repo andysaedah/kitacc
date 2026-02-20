@@ -17,8 +17,16 @@ try {
         case 'create':
             $name = trim($_POST['name'] ?? '');
             $description = trim($_POST['description'] ?? '');
+            $icon = trim($_POST['icon'] ?? 'fa-university');
+            $color = trim($_POST['color'] ?? 'primary');
             if (!$name)
                 throw new Exception('Name is required.');
+
+            // Validate icon and color
+            $allowedIcons = ['fa-university','fa-coins','fa-wallet','fa-piggy-bank','fa-money-bill-wave','fa-credit-card','fa-hand-holding-usd','fa-landmark','fa-money-check-alt','fa-donate'];
+            $allowedColors = ['primary','secondary','success','warning','danger','info'];
+            if (!in_array($icon, $allowedIcons)) $icon = 'fa-university';
+            if (!in_array($color, $allowedColors)) $color = 'primary';
 
             // Check for duplicate name
             $chk = $pdo->prepare("SELECT COUNT(*) FROM account_types WHERE name = ?");
@@ -26,8 +34,8 @@ try {
             if ($chk->fetchColumn() > 0)
                 throw new Exception('An account type with this name already exists.');
 
-            $pdo->prepare("INSERT INTO account_types (name, description) VALUES (?, ?)")
-                ->execute([$name, $description ?: null]);
+            $pdo->prepare("INSERT INTO account_types (name, description, icon, color) VALUES (?, ?, ?, ?)")
+                ->execute([$name, $description ?: null, $icon, $color]);
             auditLog('account_type_created', 'account_types', $pdo->lastInsertId());
             echo json_encode(['success' => true, 'message' => 'Account type created.']);
             break;
@@ -36,8 +44,16 @@ try {
             $id = intval($_POST['id'] ?? 0);
             $name = trim($_POST['name'] ?? '');
             $description = trim($_POST['description'] ?? '');
+            $icon = trim($_POST['icon'] ?? 'fa-university');
+            $color = trim($_POST['color'] ?? 'primary');
             if (!$name)
                 throw new Exception('Name is required.');
+
+            // Validate icon and color
+            $allowedIcons = ['fa-university','fa-coins','fa-wallet','fa-piggy-bank','fa-money-bill-wave','fa-credit-card','fa-hand-holding-usd','fa-landmark','fa-money-check-alt','fa-donate'];
+            $allowedColors = ['primary','secondary','success','warning','danger','info'];
+            if (!in_array($icon, $allowedIcons)) $icon = 'fa-university';
+            if (!in_array($color, $allowedColors)) $color = 'primary';
 
             // Check for duplicate name (exclude self)
             $chk = $pdo->prepare("SELECT COUNT(*) FROM account_types WHERE name = ? AND id != ?");
@@ -45,8 +61,8 @@ try {
             if ($chk->fetchColumn() > 0)
                 throw new Exception('An account type with this name already exists.');
 
-            $pdo->prepare("UPDATE account_types SET name = ?, description = ? WHERE id = ?")
-                ->execute([$name, $description ?: null, $id]);
+            $pdo->prepare("UPDATE account_types SET name = ?, description = ?, icon = ?, color = ? WHERE id = ?")
+                ->execute([$name, $description ?: null, $icon, $color, $id]);
             auditLog('account_type_updated', 'account_types', $id);
             echo json_encode(['success' => true, 'message' => 'Account type updated.']);
             break;

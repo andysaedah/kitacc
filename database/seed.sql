@@ -43,6 +43,10 @@ INSERT INTO `funds` (`branch_id`, `name`, `description`) VALUES
 (1, 'Mission', 'Mission fund for outreach and missionary work');
 
 -- Default Account for Main Branch
-INSERT INTO `accounts` (`branch_id`, `name`, `type`, `account_number`, `balance`) VALUES
-(1, 'Main Bank Account', 'bank', '', 0.00),
-(1, 'Petty Cash', 'petty_cash', NULL, 0.00);
+INSERT INTO `account_types` (`name`, `description`, `icon`, `color`) VALUES
+('Bank Account', 'Standard bank account for deposits and withdrawals', 'fa-university', 'primary'),
+('Petty Cash', 'Small cash fund for minor expenses', 'fa-coins', 'secondary');
+
+INSERT INTO `accounts` (`branch_id`, `name`, `account_type_id`, `account_number`, `balance`, `is_default`) VALUES
+(1, 'Main Bank Account', 1, '', 0.00, 1),
+(1, 'Petty Cash', 2, NULL, 0.00, 0);

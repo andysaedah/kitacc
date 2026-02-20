@@ -17,28 +17,31 @@ try {
     switch ($action) {
         case 'create':
             $name = trim($_POST['name'] ?? '');
-            $type = $_POST['type'] ?? 'bank';
             $accountNumber = trim($_POST['account_number'] ?? '');
-            $accountTypeId = !empty($_POST['account_type_id']) ? intval($_POST['account_type_id']) : null;
+            $accountTypeId = intval($_POST['account_type_id'] ?? 0);
             $targetBranch = ($user['role'] === ROLE_SUPERADMIN && !empty($_POST['branch_id'])) ? intval($_POST['branch_id']) : $branchId;
             if (!$name)
                 throw new Exception('Name is required.');
+            if (!$accountTypeId)
+                throw new Exception('Account type is required.');
 
-            $pdo->prepare("INSERT INTO accounts (branch_id, name, type, account_number, account_type_id) VALUES (?, ?, ?, ?, ?)")
-                ->execute([$targetBranch, $name, $type, $accountNumber, $accountTypeId]);
+            $pdo->prepare("INSERT INTO accounts (branch_id, name, account_type_id, account_number) VALUES (?, ?, ?, ?)")
+                ->execute([$targetBranch, $name, $accountTypeId, $accountNumber]);
             auditLog('account_created', 'accounts', $pdo->lastInsertId());
             echo json_encode(['success' => true, 'message' => 'Account created.']);
             break;
 
         case 'update':
             $id = intval($_POST['id'] ?? 0);
-            $accountTypeId = !empty($_POST['account_type_id']) ? intval($_POST['account_type_id']) : null;
+            $accountTypeId = intval($_POST['account_type_id'] ?? 0);
+            if (!$accountTypeId)
+                throw new Exception('Account type is required.');
             if ($user['role'] === ROLE_SUPERADMIN) {
-                $pdo->prepare("UPDATE accounts SET name = ?, type = ?, account_number = ?, account_type_id = ? WHERE id = ?")
-                    ->execute([trim($_POST['name']), $_POST['type'], trim($_POST['account_number'] ?? ''), $accountTypeId, $id]);
+                $pdo->prepare("UPDATE accounts SET name = ?, account_number = ?, account_type_id = ? WHERE id = ?")
+                    ->execute([trim($_POST['name']), trim($_POST['account_number'] ?? ''), $accountTypeId, $id]);
             } else {
-                $pdo->prepare("UPDATE accounts SET name = ?, type = ?, account_number = ?, account_type_id = ? WHERE id = ? AND branch_id = ?")
-                    ->execute([trim($_POST['name']), $_POST['type'], trim($_POST['account_number'] ?? ''), $accountTypeId, $id, $branchId]);
+                $pdo->prepare("UPDATE accounts SET name = ?, account_number = ?, account_type_id = ? WHERE id = ? AND branch_id = ?")
+                    ->execute([trim($_POST['name']), trim($_POST['account_number'] ?? ''), $accountTypeId, $id, $branchId]);
             }
             auditLog('account_updated', 'accounts', $id);
             echo json_encode(['success' => true, 'message' => 'Account updated.']);

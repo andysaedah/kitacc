@@ -58,6 +58,7 @@ include __DIR__ . '/includes/header.php';
                             <th style="width: 50px;">Status</th>
                             <th>Name</th>
                             <th>Description</th>
+                            <th style="width: 80px;">Icon</th>
                             <th style="width: 100px;">Accounts</th>
                             <th style="width: 120px;">Created</th>
                             <th style="width: 100px;">Actions</th>
@@ -80,6 +81,11 @@ include __DIR__ . '/includes/header.php';
                                     <?php echo htmlspecialchars($at['description'] ?? '—'); ?>
                                 </td>
                                 <td>
+                                    <span class="stat-icon <?php echo htmlspecialchars($at['color']); ?>" style="width: 2rem; height: 2rem; font-size: 0.8rem;">
+                                        <i class="fas <?php echo htmlspecialchars($at['icon']); ?>"></i>
+                                    </span>
+                                </td>
+                                <td>
                                     <span class="badge badge-info"><?php echo $at['account_count']; ?> account<?php echo $at['account_count'] != 1 ? 's' : ''; ?></span>
                                 </td>
                                 <td class="text-muted" style="font-size: 0.8rem;">
@@ -88,7 +94,7 @@ include __DIR__ . '/includes/header.php';
                                 <td>
                                     <div class="d-flex gap-2">
                                         <button class="btn btn-icon btn-ghost btn-sm"
-                                            onclick="editType(<?php echo $at['id']; ?>, '<?php echo htmlspecialchars(addslashes($at['name'])); ?>', '<?php echo htmlspecialchars(addslashes($at['description'] ?? '')); ?>')"
+                                            onclick="editType(<?php echo $at['id']; ?>, '<?php echo htmlspecialchars(addslashes($at['name'])); ?>', '<?php echo htmlspecialchars(addslashes($at['description'] ?? '')); ?>', '<?php echo htmlspecialchars($at['icon']); ?>', '<?php echo htmlspecialchars($at['color']); ?>')"
                                             title="Edit"><i class="fas fa-edit"></i></button>
                                         <?php if ($at['account_count'] == 0): ?>
                                             <button class="btn btn-icon btn-ghost btn-sm text-danger"
@@ -132,6 +138,42 @@ include __DIR__ . '/includes/header.php';
                     <label class="form-label">Description</label>
                     <input type="text" name="description" class="form-control" placeholder="Brief description (optional)">
                 </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="form-group">
+                        <label class="form-label required">Icon</label>
+                        <select name="icon" class="form-control" required>
+                            <option value="fa-university">Bank (fa-university)</option>
+                            <option value="fa-coins">Coins (fa-coins)</option>
+                            <option value="fa-wallet">Wallet (fa-wallet)</option>
+                            <option value="fa-piggy-bank">Piggy Bank (fa-piggy-bank)</option>
+                            <option value="fa-money-bill-wave">Cash (fa-money-bill-wave)</option>
+                            <option value="fa-credit-card">Card (fa-credit-card)</option>
+                            <option value="fa-hand-holding-usd">Holding USD (fa-hand-holding-usd)</option>
+                            <option value="fa-landmark">Landmark (fa-landmark)</option>
+                            <option value="fa-money-check-alt">Cheque (fa-money-check-alt)</option>
+                            <option value="fa-donate">Donate (fa-donate)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label required">Color</label>
+                        <select name="color" class="form-control" required>
+                            <option value="primary">Purple (Primary)</option>
+                            <option value="secondary">Light Purple (Secondary)</option>
+                            <option value="success">Green (Success)</option>
+                            <option value="warning">Orange (Warning)</option>
+                            <option value="danger">Red (Danger)</option>
+                            <option value="info">Blue (Info)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Preview</label>
+                    <div id="iconPreview" class="d-flex align-center gap-2">
+                        <span class="stat-icon primary" style="width: 2.5rem; height: 2.5rem;">
+                            <i class="fas fa-university" id="previewIcon"></i>
+                        </span>
+                    </div>
+                </div>
             </form>
         </div>
         <div class="modal-footer">
@@ -160,12 +202,15 @@ $page_scripts = <<<'SCRIPT'
         });
     }
 
-    function editType(id, name, description) {
+    function editType(id, name, description, icon, color) {
         document.getElementById('typeId').value = id;
         document.getElementById('typeModalTitle').textContent = 'Edit Account Type';
         const form = document.getElementById('typeForm');
         form.querySelector('[name="name"]').value = name;
         form.querySelector('[name="description"]').value = description;
+        form.querySelector('[name="icon"]').value = icon;
+        form.querySelector('[name="color"]').value = color;
+        updatePreview();
         KiTAcc.openModal('typeModal');
     }
 
@@ -189,6 +234,21 @@ $page_scripts = <<<'SCRIPT'
             }
         });
     }
+
+    function updatePreview() {
+        const icon = document.querySelector('[name="icon"]').value;
+        const color = document.querySelector('[name="color"]').value;
+        const previewIcon = document.getElementById('previewIcon');
+        const previewWrap = previewIcon.closest('.stat-icon');
+        previewIcon.className = 'fas ' + icon;
+        previewWrap.className = 'stat-icon ' + color;
+        previewWrap.style.width = '2.5rem';
+        previewWrap.style.height = '2.5rem';
+    }
+
+    // Live preview on change
+    document.querySelector('[name="icon"]').addEventListener('change', updatePreview);
+    document.querySelector('[name="color"]').addEventListener('change', updatePreview);
 </script>
 SCRIPT;
 include __DIR__ . '/includes/footer.php';

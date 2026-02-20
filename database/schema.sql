@@ -68,6 +68,8 @@ CREATE TABLE `account_types` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `name` VARCHAR(100) NOT NULL,
     `description` VARCHAR(255) NULL,
+    `icon` VARCHAR(50) NOT NULL DEFAULT 'fa-university',
+    `color` VARCHAR(20) NOT NULL DEFAULT 'primary',
     `is_active` TINYINT(1) NOT NULL DEFAULT 1,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -80,8 +82,7 @@ CREATE TABLE `accounts` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `branch_id` INT UNSIGNED NOT NULL,
     `name` VARCHAR(100) NOT NULL,
-    `type` ENUM('bank','petty_cash') NOT NULL DEFAULT 'bank',
-    `account_type_id` INT UNSIGNED NULL,
+    `account_type_id` INT UNSIGNED NOT NULL,
     `account_number` VARCHAR(50) NULL,
     `balance` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
     `is_active` TINYINT(1) NOT NULL DEFAULT 1,

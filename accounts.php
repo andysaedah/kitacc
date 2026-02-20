@@ -13,7 +13,8 @@ $page_title = 'Accounts - KiTAcc';
 
 try {
     $pdo = db();
-    $sql = "SELECT a.*, b.name AS branch_name, at.name AS type_name 
+    $sql = "SELECT a.*, b.name AS branch_name, 
+                   at.name AS type_name, at.icon AS type_icon, at.color AS type_color
             FROM accounts a 
             LEFT JOIN branches b ON a.branch_id = b.id 
             LEFT JOIN account_types at ON a.account_type_id = at.id 
@@ -38,7 +39,7 @@ try {
     // Account types for dropdown
     $accountTypes = [];
     try {
-        $stmt = $pdo->query("SELECT id, name FROM account_types WHERE is_active = 1 ORDER BY name");
+        $stmt = $pdo->query("SELECT id, name, icon, color FROM account_types WHERE is_active = 1 ORDER BY name");
         $accountTypes = $stmt->fetchAll();
     } catch (Exception $e) {
         // account_types table may not exist yet (pre-migration)
@@ -74,12 +75,12 @@ include __DIR__ . '/includes/header.php';
     <?php else: ?>
         <?php foreach ($accountList as $acc): ?>
             <div class="stat-card" style="cursor: default; <?php echo !$acc['is_active'] ? 'opacity: 0.5;' : ''; ?>">
-                <div class="stat-icon <?php echo $acc['type'] === 'bank' ? 'primary' : 'secondary'; ?>">
-                    <i class="fas <?php echo $acc['type'] === 'bank' ? 'fa-university' : 'fa-coins'; ?>"></i>
+                <div class="stat-icon <?php echo htmlspecialchars($acc['type_color'] ?? 'primary'); ?>">
+                    <i class="fas <?php echo htmlspecialchars($acc['type_icon'] ?? 'fa-university'); ?>"></i>
                 </div>
                 <div class="stat-content">
                     <div class="stat-label d-flex align-center gap-2">
-                        <?php echo htmlspecialchars($acc['type_name'] ?? ucfirst(str_replace('_', ' ', $acc['type']))); ?>
+                        <?php echo htmlspecialchars($acc['type_name'] ?? 'Unknown Type'); ?>
                         <?php if ($acc['is_default']): ?>
                             <span class="badge badge-primary" style="font-size: 0.6rem; padding: 0.15rem 0.4rem;">DEFAULT</span>
                         <?php endif; ?>
@@ -107,7 +108,7 @@ include __DIR__ . '/includes/header.php';
                         </label>
                         <div class="d-flex gap-2">
                             <button class="btn btn-sm btn-ghost"
-                                onclick="editAccount(<?php echo $acc['id']; ?>, '<?php echo htmlspecialchars(addslashes($acc['name'])); ?>', '<?php echo $acc['type']; ?>', '<?php echo htmlspecialchars(addslashes($acc['account_number'] ?? '')); ?>', '<?php echo $acc['account_type_id'] ?? ''; ?>')"><i
+                                onclick="editAccount(<?php echo $acc['id']; ?>, '<?php echo htmlspecialchars(addslashes($acc['name'])); ?>', '<?php echo htmlspecialchars(addslashes($acc['account_number'] ?? '')); ?>', '<?php echo $acc['account_type_id'] ?? ''; ?>')"><i
                                     class="fas fa-edit"></i></button>
                             <?php if (!$acc['is_default']): ?>
                                 <button class="btn btn-sm btn-ghost text-danger" onclick="deleteAccount(<?php echo $acc['id']; ?>)"><i
@@ -147,26 +148,17 @@ include __DIR__ . '/includes/header.php';
                 <div class="form-group"><label class="form-label required">Account Name</label><input type="text"
                         name="name" class="form-control" placeholder="e.g. Main Bank Account" required></div>
                 <div class="form-group">
-                    <label class="form-label required">Type</label>
-                    <select name="type" class="form-control" required>
-                        <option value="bank">Bank Account</option>
-                        <option value="petty_cash">Petty Cash</option>
+                    <label class="form-label required">Account Type</label>
+                    <select name="account_type_id" class="form-control" required>
+                        <option value="">Select Account Type</option>
+                        <?php foreach ($accountTypes as $at): ?>
+                            <option value="<?php echo $at['id']; ?>">
+                                <?php echo htmlspecialchars($at['name']); ?>
+                            </option>
+                        <?php endforeach; ?>
                     </select>
+                    <span class="form-help">Managed by superadmin in Account Types settings.</span>
                 </div>
-                <?php if (!empty($accountTypes)): ?>
-                    <div class="form-group">
-                        <label class="form-label">Account Type</label>
-                        <select name="account_type_id" class="form-control">
-                            <option value="">-- Select Type --</option>
-                            <?php foreach ($accountTypes as $at): ?>
-                                <option value="<?php echo $at['id']; ?>">
-                                    <?php echo htmlspecialchars($at['name']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <span class="form-help">Optional. Managed by superadmin in Account Types settings.</span>
-                    </div>
-                <?php endif; ?>
                 <div class="form-group"><label class="form-label">Account Number</label><input type="text"
                         name="account_number" class="form-control" placeholder="Optional"></div>
             </form>
@@ -190,15 +182,13 @@ $page_scripts = <<<'SCRIPT'
             else KiTAcc.toast(res.message || 'Error.', 'error');
         });
     }
-    function editAccount(id, name, type, accNum, accountTypeId) {
+    function editAccount(id, name, accNum, accountTypeId) {
         document.getElementById('accountId').value = id;
         document.getElementById('accountModalTitle').textContent = 'Edit Account';
         const form = document.getElementById('accountForm');
         form.querySelector('[name="name"]').value = name;
-        form.querySelector('[name="type"]').value = type;
         form.querySelector('[name="account_number"]').value = accNum;
-        const atSelect = form.querySelector('[name="account_type_id"]');
-        if (atSelect) atSelect.value = accountTypeId || '';
+        form.querySelector('[name="account_type_id"]').value = accountTypeId || '';
         KiTAcc.openModal('addAccountModal');
     }
     function deleteAccount(id) {
