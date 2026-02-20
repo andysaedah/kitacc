@@ -142,6 +142,11 @@ $userRole = $user['role'] ?? '';
                     <span class="nav-item-text">Categories</span>
                 </a>
 
+                <a href="account_types.php" class="nav-item <?php echo $currentPage === 'account_types' ? 'active' : ''; ?>" aria-label="Account Types">
+                    <i class="fas fa-layer-group" aria-hidden="true"></i>
+                    <span class="nav-item-text">Account Types</span>
+                </a>
+
                 <a href="api_integration.php"
                     class="nav-item <?php echo $currentPage === 'api_integration' ? 'active' : ''; ?>" aria-label="API Integration">
                     <i class="fas fa-plug" aria-hidden="true"></i>

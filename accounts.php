@@ -1,7 +1,7 @@
 <?php
 /**
  * KiTAcc - Accounts Management
- * Bank / Petty Cash account CRUD
+ * Bank / Petty Cash account CRUD with activate/deactivate
  */
 require_once __DIR__ . '/includes/config.php';
 requireLogin();
@@ -13,13 +13,17 @@ $page_title = 'Accounts - KiTAcc';
 
 try {
     $pdo = db();
-    $sql = "SELECT a.*, b.name AS branch_name FROM accounts a LEFT JOIN branches b ON a.branch_id = b.id WHERE 1=1";
+    $sql = "SELECT a.*, b.name AS branch_name, at.name AS type_name 
+            FROM accounts a 
+            LEFT JOIN branches b ON a.branch_id = b.id 
+            LEFT JOIN account_types at ON a.account_type_id = at.id 
+            WHERE 1=1";
     $params = [];
     if ($branchId !== null) {
         $sql .= " AND a.branch_id = ?";
         $params[] = $branchId;
     }
-    $sql .= " ORDER BY a.name";
+    $sql .= " ORDER BY a.is_default DESC, a.is_active DESC, a.name";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $accountList = $stmt->fetchAll();
@@ -30,9 +34,19 @@ try {
         $stmt = $pdo->query("SELECT id, name FROM branches WHERE is_active = 1 ORDER BY name");
         $branches = $stmt->fetchAll();
     }
+
+    // Account types for dropdown
+    $accountTypes = [];
+    try {
+        $stmt = $pdo->query("SELECT id, name FROM account_types WHERE is_active = 1 ORDER BY name");
+        $accountTypes = $stmt->fetchAll();
+    } catch (Exception $e) {
+        // account_types table may not exist yet (pre-migration)
+    }
 } catch (Exception $e) {
     $accountList = [];
     $branches = [];
+    $accountTypes = [];
 }
 
 include __DIR__ . '/includes/header.php';
@@ -59,13 +73,19 @@ include __DIR__ . '/includes/header.php';
         </div>
     <?php else: ?>
         <?php foreach ($accountList as $acc): ?>
-            <div class="stat-card" style="cursor: default;">
+            <div class="stat-card" style="cursor: default; <?php echo !$acc['is_active'] ? 'opacity: 0.5;' : ''; ?>">
                 <div class="stat-icon <?php echo $acc['type'] === 'bank' ? 'primary' : 'secondary'; ?>">
                     <i class="fas <?php echo $acc['type'] === 'bank' ? 'fa-university' : 'fa-coins'; ?>"></i>
                 </div>
                 <div class="stat-content">
-                    <div class="stat-label">
-                        <?php echo ucfirst(str_replace('_', ' ', $acc['type'])); ?>
+                    <div class="stat-label d-flex align-center gap-2">
+                        <?php echo htmlspecialchars($acc['type_name'] ?? ucfirst(str_replace('_', ' ', $acc['type']))); ?>
+                        <?php if ($acc['is_default']): ?>
+                            <span class="badge badge-primary" style="font-size: 0.6rem; padding: 0.15rem 0.4rem;">DEFAULT</span>
+                        <?php endif; ?>
+                        <?php if (!$acc['is_active']): ?>
+                            <span class="badge badge-danger" style="font-size: 0.6rem; padding: 0.15rem 0.4rem;">INACTIVE</span>
+                        <?php endif; ?>
                     </div>
                     <div class="stat-value" style="font-size: 1.125rem;">
                         <?php echo htmlspecialchars($acc['name']); ?>
@@ -78,12 +98,22 @@ include __DIR__ . '/includes/header.php';
                     <div class="font-semibold mt-2 text-primary">
                         <?php echo formatCurrency($acc['balance']); ?>
                     </div>
-                    <div class="d-flex gap-2 mt-2">
-                        <button class="btn btn-sm btn-ghost"
-                            onclick="editAccount(<?php echo $acc['id']; ?>, '<?php echo htmlspecialchars(addslashes($acc['name'])); ?>', '<?php echo $acc['type']; ?>', '<?php echo htmlspecialchars(addslashes($acc['account_number'] ?? '')); ?>')"><i
-                                class="fas fa-edit"></i></button>
-                        <button class="btn btn-sm btn-ghost text-danger" onclick="deleteAccount(<?php echo $acc['id']; ?>)"><i
-                                class="fas fa-trash"></i></button>
+                    <div class="d-flex align-center justify-between mt-2">
+                        <label class="toggle-switch" title="<?php echo $acc['is_default'] ? 'Default account cannot be deactivated' : ($acc['is_active'] ? 'Deactivate account' : 'Activate account'); ?>">
+                            <input type="checkbox" <?php echo $acc['is_active'] ? 'checked' : ''; ?>
+                                <?php echo $acc['is_default'] ? 'disabled' : ''; ?>
+                                onchange="toggleAccountActive(<?php echo $acc['id']; ?>, this.checked, this)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-ghost"
+                                onclick="editAccount(<?php echo $acc['id']; ?>, '<?php echo htmlspecialchars(addslashes($acc['name'])); ?>', '<?php echo $acc['type']; ?>', '<?php echo htmlspecialchars(addslashes($acc['account_number'] ?? '')); ?>', '<?php echo $acc['account_type_id'] ?? ''; ?>')"><i
+                                    class="fas fa-edit"></i></button>
+                            <?php if (!$acc['is_default']): ?>
+                                <button class="btn btn-sm btn-ghost text-danger" onclick="deleteAccount(<?php echo $acc['id']; ?>)"><i
+                                        class="fas fa-trash"></i></button>
+                            <?php endif; ?>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -123,6 +153,20 @@ include __DIR__ . '/includes/header.php';
                         <option value="petty_cash">Petty Cash</option>
                     </select>
                 </div>
+                <?php if (!empty($accountTypes)): ?>
+                    <div class="form-group">
+                        <label class="form-label">Account Type</label>
+                        <select name="account_type_id" class="form-control">
+                            <option value="">-- Select Type --</option>
+                            <?php foreach ($accountTypes as $at): ?>
+                                <option value="<?php echo $at['id']; ?>">
+                                    <?php echo htmlspecialchars($at['name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <span class="form-help">Optional. Managed by superadmin in Account Types settings.</span>
+                    </div>
+                <?php endif; ?>
                 <div class="form-group"><label class="form-label">Account Number</label><input type="text"
                         name="account_number" class="form-control" placeholder="Optional"></div>
             </form>
@@ -146,13 +190,15 @@ $page_scripts = <<<'SCRIPT'
             else KiTAcc.toast(res.message || 'Error.', 'error');
         });
     }
-    function editAccount(id, name, type, accNum) {
+    function editAccount(id, name, type, accNum, accountTypeId) {
         document.getElementById('accountId').value = id;
         document.getElementById('accountModalTitle').textContent = 'Edit Account';
         const form = document.getElementById('accountForm');
         form.querySelector('[name="name"]').value = name;
         form.querySelector('[name="type"]').value = type;
         form.querySelector('[name="account_number"]').value = accNum;
+        const atSelect = form.querySelector('[name="account_type_id"]');
+        if (atSelect) atSelect.value = accountTypeId || '';
         KiTAcc.openModal('addAccountModal');
     }
     function deleteAccount(id) {
@@ -160,6 +206,20 @@ $page_scripts = <<<'SCRIPT'
         KiTAcc.post('api/accounts.php', { action: 'delete', id: id }, function(res) {
             if (res.success) { KiTAcc.toast('Deleted.', 'success'); setTimeout(() => location.reload(), 600); }
             else KiTAcc.toast(res.message || 'Error.', 'error');
+        });
+    }
+    function toggleAccountActive(id, isActive, el) {
+        const card = el.closest('.stat-card');
+        KiTAcc.post('api/accounts.php', { action: 'toggle_active', id: id, is_active: isActive ? 1 : 0 }, function(res) {
+            if (res.success) {
+                KiTAcc.toast(isActive ? 'Account activated.' : 'Account deactivated.', 'success');
+                card.style.opacity = isActive ? '1' : '0.5';
+                // Update badge display
+                setTimeout(() => location.reload(), 600);
+            } else {
+                KiTAcc.toast(res.message || 'Error.', 'error');
+                el.checked = !isActive;
+            }
         });
     }
 </script>

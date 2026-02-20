@@ -62,6 +62,18 @@ CREATE TABLE `settings` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================
+-- ACCOUNT TYPES (Superadmin-managed)
+-- =============================================
+CREATE TABLE `account_types` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `name` VARCHAR(100) NOT NULL,
+    `description` VARCHAR(255) NULL,
+    `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================
 -- ACCOUNTS (Bank / Petty Cash)
 -- =============================================
 CREATE TABLE `accounts` (
@@ -69,12 +81,15 @@ CREATE TABLE `accounts` (
     `branch_id` INT UNSIGNED NOT NULL,
     `name` VARCHAR(100) NOT NULL,
     `type` ENUM('bank','petty_cash') NOT NULL DEFAULT 'bank',
+    `account_type_id` INT UNSIGNED NULL,
     `account_number` VARCHAR(50) NULL,
     `balance` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
     `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+    `is_default` TINYINT(1) NOT NULL DEFAULT 0,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (`branch_id`) REFERENCES `branches`(`id`) ON DELETE CASCADE
+    FOREIGN KEY (`branch_id`) REFERENCES `branches`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`account_type_id`) REFERENCES `account_types`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================
