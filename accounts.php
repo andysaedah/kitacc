@@ -8,7 +8,7 @@ requireLogin();
 requireRole(ROLE_BRANCH_FINANCE);
 
 $user = getCurrentUser();
-$branchId = getActiveBranchId();
+$branchId = getActiveBranchId() ?? $user['branch_id'];
 $page_title = 'Accounts - KiTAcc';
 
 try {
@@ -18,12 +18,8 @@ try {
             FROM accounts a 
             LEFT JOIN branches b ON a.branch_id = b.id 
             LEFT JOIN account_types at ON a.account_type_id = at.id 
-            WHERE 1=1";
-    $params = [];
-    if ($branchId !== null) {
-        $sql .= " AND a.branch_id = ?";
-        $params[] = $branchId;
-    }
+            WHERE a.branch_id = ?";
+    $params = [$branchId];
     $sql .= " ORDER BY a.is_default DESC, a.is_active DESC, a.name";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
