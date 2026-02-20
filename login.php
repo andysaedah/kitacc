@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isAjax()) {
         <div class="login-card">
             <div class="login-header">
                 <div class="login-logo">
-                    <img src="img/logo-white.svg" alt="BWCC" class="login-logo-img">
+                    <i class="fas fa-box-heart"></i>
                 </div>
                 <h1 class="login-title">KiTAcc</h1>
                 <p class="login-subtitle">
