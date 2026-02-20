@@ -56,8 +56,8 @@ INSERT INTO `categories` (`name`, `type`) VALUES
 -- Funds (Pre-defined)
 INSERT INTO `funds` (`branch_id`, `name`, `description`) VALUES
 (1, 'General Fund', 'Default unallocated fund'),
-(1, 'Mission', 'Mission fund for outreach and missionary work'),
-(1, 'Petty Cash', 'Small cash fund for minor day-to-day expenses');
+(1, 'Petty Cash', 'Small cash fund for minor day-to-day expenses'),
+(1, 'Mission', 'Mission fund for outreach and missionary work');
 
 -- Default Account Types
 INSERT INTO `account_types` (`name`, `description`, `icon`, `color`) VALUES
