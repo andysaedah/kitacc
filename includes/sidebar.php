@@ -13,7 +13,7 @@ $userRole = $user['role'] ?? '';
     <div class="sidebar-header">
         <a href="dashboard.php" class="sidebar-logo" aria-label="KiTAcc Home">
             <div class="sidebar-logo-icon">
-                <i class="fas fa-box-heart" aria-hidden="true"></i>
+                <i class="fas fa-donate" aria-hidden="true"></i>
             </div>
             <span class="sidebar-logo-text"><?php echo htmlspecialchars(getSetting('app_name', 'KiTAcc')); ?></span>
         </a>
