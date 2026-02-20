@@ -200,7 +200,10 @@ function loginUser(string $username, string $password): array
         // Audit log
         auditLog('login', 'user', $user['id']);
 
-        return ['success' => true, 'message' => 'Login successful.', 'redirect' => 'dashboard.php'];
+        // Redirect based on role — regular users go to claims, others to dashboard
+        $redirect = ($user['role'] === ROLE_USER || $user['role'] === ROLE_VIEWER) ? 'claims.php' : 'dashboard.php';
+
+        return ['success' => true, 'message' => 'Login successful.', 'redirect' => $redirect];
 
     } catch (Exception $e) {
         return ['success' => false, 'message' => 'Login failed. Please try again.'];
