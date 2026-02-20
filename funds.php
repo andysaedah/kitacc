@@ -29,6 +29,7 @@ try {
 
     // Fetch funds with calculated balances
     // General Fund also includes transactions with fund_id IS NULL (unallocated)
+    // and account starting balances for the branch
     $sql = "SELECT f.*,
                 COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.fund_id = f.id AND t.type = 'income'), 0)
                 - COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.fund_id = f.id AND t.type = 'expense'), 0)
@@ -37,6 +38,7 @@ try {
                 + CASE WHEN f.name = 'General Fund' THEN
                     COALESCE((SELECT SUM(t2.amount) FROM transactions t2 WHERE t2.fund_id IS NULL AND t2.type = 'income' AND t2.branch_id = f.branch_id), 0)
                     - COALESCE((SELECT SUM(t2.amount) FROM transactions t2 WHERE t2.fund_id IS NULL AND t2.type = 'expense' AND t2.branch_id = f.branch_id), 0)
+                    + COALESCE((SELECT SUM(a.balance) FROM accounts a WHERE a.is_active = 1 AND a.branch_id = f.branch_id), 0)
                   ELSE 0 END
                 AS balance
             FROM funds f WHERE f.is_active = 1";
