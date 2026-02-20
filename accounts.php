@@ -1,11 +1,11 @@
 <?php
 /**
- * KiTAcc - Accounts Management
- * Bank account CRUD with activate/deactivate
+ * KiTAcc - Accounts (Branch Finance view)
+ * View-only account list with active/inactive toggle
  */
 require_once __DIR__ . '/includes/config.php';
 requireLogin();
-requireRole(ROLE_SUPERADMIN);
+requireRole(ROLE_BRANCH_FINANCE);
 
 $user = getCurrentUser();
 $branchId = getActiveBranchId();
@@ -28,24 +28,8 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $accountList = $stmt->fetchAll();
-
-    // Branches for dropdown
-    $branches = [];
-    $stmt = $pdo->query("SELECT id, name FROM branches WHERE is_active = 1 ORDER BY name");
-    $branches = $stmt->fetchAll();
-
-    // Account types for dropdown
-    $accountTypes = [];
-    try {
-        $stmt = $pdo->query("SELECT id, name, icon, color FROM account_types WHERE is_active = 1 ORDER BY name");
-        $accountTypes = $stmt->fetchAll();
-    } catch (Exception $e) {
-        // account_types table may not exist yet (pre-migration)
-    }
 } catch (Exception $e) {
     $accountList = [];
-    $branches = [];
-    $accountTypes = [];
 }
 
 include __DIR__ . '/includes/header.php';
@@ -54,9 +38,8 @@ include __DIR__ . '/includes/header.php';
 <div class="d-flex justify-between align-center mb-6">
     <div>
         <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--gray-800);">Accounts</h1>
-        <p class="text-muted">Manage bank accounts</p>
+        <p class="text-muted">View branch accounts and available balances</p>
     </div>
-    <button class="btn btn-primary" onclick="openAddAccount()"><i class="fas fa-plus"></i> Add Account</button>
 </div>
 
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -65,7 +48,7 @@ include __DIR__ . '/includes/header.php';
             <div class="card-body">
                 <div class="empty-state"><i class="fas fa-university"></i>
                     <h3>No Accounts</h3>
-                    <p>Add your first bank account.</p>
+                    <p>No accounts have been assigned to your branch yet. Contact the superadmin.</p>
                 </div>
             </div>
         </div>
@@ -93,130 +76,38 @@ include __DIR__ . '/includes/header.php';
                             <?php echo htmlspecialchars($acc['account_number']); ?>
                         </div>
                     <?php endif; ?>
-                    <div class="font-semibold mt-2 text-primary">
+                    <div class="font-semibold mt-2 text-primary" style="font-size: 1.25rem;">
                         <?php echo formatCurrency($acc['balance']); ?>
                     </div>
-                    <div class="d-flex align-center justify-between mt-2">
-                        <label class="toggle-switch" title="<?php echo $acc['is_default'] ? 'Default account cannot be deactivated' : ($acc['is_active'] ? 'Deactivate account' : 'Activate account'); ?>">
-                            <input type="checkbox" <?php echo $acc['is_active'] ? 'checked' : ''; ?>
-                                <?php echo $acc['is_default'] ? 'disabled' : ''; ?>
-                                onchange="toggleAccountActive(<?php echo $acc['id']; ?>, this.checked, this)">
-                            <span class="toggle-slider"></span>
-                        </label>
-                        <div class="d-flex gap-2">
-                            <button class="btn btn-sm btn-ghost"
-                                onclick="editAccount(<?php echo $acc['id']; ?>, '<?php echo htmlspecialchars(addslashes($acc['name'])); ?>', '<?php echo htmlspecialchars(addslashes($acc['account_number'] ?? '')); ?>', '<?php echo $acc['account_type_id'] ?? ''; ?>')"><i
-                                    class="fas fa-edit"></i></button>
-                            <?php if (!$acc['is_default']): ?>
-                                <button class="btn btn-sm btn-ghost text-danger" onclick="deleteAccount(<?php echo $acc['id']; ?>)"><i
-                                        class="fas fa-trash"></i></button>
-                            <?php endif; ?>
+                    <div class="text-muted" style="font-size: 0.7rem; margin-top: 0.25rem;">Current available balance</div>
+                    <?php if (!$acc['is_default']): ?>
+                        <div class="d-flex align-center mt-2">
+                            <label class="toggle-switch" title="<?php echo $acc['is_active'] ? 'Deactivate account' : 'Activate account'; ?>">
+                                <input type="checkbox" <?php echo $acc['is_active'] ? 'checked' : ''; ?>
+                                    onchange="toggleAccountActive(<?php echo $acc['id']; ?>, this.checked, this)">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="text-muted" style="font-size: 0.75rem; margin-left: 0.5rem;">
+                                <?php echo $acc['is_active'] ? 'Active' : 'Inactive'; ?>
+                            </span>
                         </div>
-                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
         <?php endforeach; ?>
     <?php endif; ?>
 </div>
 
-<!-- Add/Edit Account Modal -->
-<div class="modal-overlay" id="addAccountModal">
-    <div class="modal">
-        <div class="modal-header">
-            <h3 class="modal-title" id="accountModalTitle">Add Account</h3>
-            <button class="modal-close"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="modal-body">
-            <form id="accountForm">
-                <input type="hidden" id="accountId" name="id" value="">
-                <?php if (!empty($branches)): ?>
-                    <div class="form-group" id="branchGroup">
-                        <label class="form-label required">Branch</label>
-                        <select name="branch_id" class="form-control" required>
-                            <option value="">Select Branch</option>
-                            <?php foreach ($branches as $br): ?>
-                                <option value="<?php echo $br['id']; ?>"><?php echo htmlspecialchars($br['name']); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                <?php endif; ?>
-                <div class="form-group">
-                    <label class="form-label required">Account Name</label>
-                    <input type="text" name="name" class="form-control" placeholder="e.g. Main Bank Account" required>
-                </div>
-                <?php if ($user['role'] === ROLE_SUPERADMIN): ?>
-                    <div class="form-group" id="accountTypeGroup">
-                        <label class="form-label required">Account Type</label>
-                        <select name="account_type_id" class="form-control" required>
-                            <option value="">Select Account Type</option>
-                            <?php foreach ($accountTypes as $at): ?>
-                                <option value="<?php echo $at['id']; ?>"><?php echo htmlspecialchars($at['name']); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="form-group" id="accountNumberGroup">
-                        <label class="form-label">Account Number</label>
-                        <input type="text" name="account_number" class="form-control" placeholder="Optional">
-                    </div>
-                    <div class="form-group" id="startingBalanceGroup">
-                        <label class="form-label">Starting Balance (<?php echo getSetting('currency_symbol', 'RM'); ?>)</label>
-                        <input type="number" name="balance" class="form-control" step="0.01" min="0" value="0.00" placeholder="0.00">
-                        <span class="form-help">Set the initial account balance (e.g. 2000.00). Only applies when creating.</span>
-                    </div>
-                <?php endif; ?>
-            </form>
-        </div>
-        <div class="modal-footer">
-            <button class="btn btn-outline" onclick="KiTAcc.closeModal('addAccountModal')">Cancel</button>
-            <button class="btn btn-primary" onclick="submitAccount()"><i class="fas fa-save"></i> Save</button>
-        </div>
-    </div>
-</div>
-
 <?php
 $page_scripts = <<<'SCRIPT'
 <script>
-    function openAddAccount() {
-        document.getElementById('accountId').value = '';
-        document.getElementById('accountModalTitle').textContent = 'Add Account';
-        document.getElementById('accountForm').reset();
-        document.getElementById('startingBalanceGroup').style.display = '';
-        KiTAcc.openModal('addAccountModal');
-    }
-    function submitAccount() {
-        const form = document.getElementById('accountForm');
-        const data = KiTAcc.serializeForm(form);
-        data.action = data.id ? 'update' : 'create';
-        KiTAcc.post('api/accounts.php', data, function(res) {
-            if (res.success) { KiTAcc.toast('Account saved!', 'success'); setTimeout(() => location.reload(), 600); }
-            else KiTAcc.toast(res.message || 'Error.', 'error');
-        });
-    }
-    function editAccount(id, name, accNum, accountTypeId) {
-        document.getElementById('accountId').value = id;
-        document.getElementById('accountModalTitle').textContent = 'Edit Account';
-        var form = document.getElementById('accountForm');
-        form.querySelector('[name="name"]').value = name;
-        form.querySelector('[name="account_number"]').value = accNum;
-        form.querySelector('[name="account_type_id"]').value = accountTypeId || '';
-        // Hide starting balance when editing
-        document.getElementById('startingBalanceGroup').style.display = 'none';
-        KiTAcc.openModal('addAccountModal');
-    }
-    function deleteAccount(id) {
-        if (!KiTAcc.confirm('Delete this account? This cannot be undone.')) return;
-        KiTAcc.post('api/accounts.php', { action: 'delete', id: id }, function(res) {
-            if (res.success) { KiTAcc.toast('Deleted.', 'success'); setTimeout(() => location.reload(), 600); }
-            else KiTAcc.toast(res.message || 'Error.', 'error');
-        });
-    }
     function toggleAccountActive(id, isActive, el) {
         var card = el.closest('.stat-card');
         KiTAcc.post('api/accounts.php', { action: 'toggle_active', id: id, is_active: isActive ? 1 : 0 }, function(res) {
             if (res.success) {
                 KiTAcc.toast(isActive ? 'Account activated.' : 'Account deactivated.', 'success');
                 card.style.opacity = isActive ? '1' : '0.5';
-                setTimeout(() => location.reload(), 600);
+                setTimeout(function() { location.reload(); }, 600);
             } else {
                 KiTAcc.toast(res.message || 'Error.', 'error');
                 el.checked = !isActive;

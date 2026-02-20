@@ -45,12 +45,28 @@ try {
                 $accountTypeId = intval($_POST['account_type_id'] ?? 0);
                 if (!$accountTypeId)
                     throw new Exception('Account type is required.');
-                $pdo->prepare("UPDATE accounts SET name = ?, account_number = ?, account_type_id = ? WHERE id = ?")
-                    ->execute([$name, trim($_POST['account_number'] ?? ''), $accountTypeId, $id]);
+
+                // Check if balance change is allowed (only if no transactions)
+                $updates = "name = ?, account_number = ?, account_type_id = ?, branch_id = ?";
+                $updateParams = [$name, trim($_POST['account_number'] ?? ''), $accountTypeId, intval($_POST['branch_id'] ?? 0)];
+
+                if (isset($_POST['balance'])) {
+                    $newBalance = floatval($_POST['balance']);
+                    $txnCheck = $pdo->prepare("SELECT COUNT(*) FROM transactions WHERE account_id = ?");
+                    $txnCheck->execute([$id]);
+                    if ($txnCheck->fetchColumn() > 0) {
+                        // Balance locked — skip balance update silently
+                    } else {
+                        $updates .= ", balance = ?";
+                        $updateParams[] = $newBalance;
+                    }
+                }
+
+                $updateParams[] = $id;
+                $pdo->prepare("UPDATE accounts SET $updates WHERE id = ?")->execute($updateParams);
             } else {
-                // Non-superadmin can only rename
-                $pdo->prepare("UPDATE accounts SET name = ? WHERE id = ? AND branch_id = ?")
-                    ->execute([$name, $id, $branchId]);
+                // Non-superadmin cannot edit accounts
+                throw new Exception('Only superadmin can edit accounts.');
             }
             auditLog('account_updated', 'accounts', $id);
             echo json_encode(['success' => true, 'message' => 'Account updated.']);
