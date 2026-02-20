@@ -29,13 +29,25 @@ INSERT INTO `categories` (`name`, `type`) VALUES
 ('Offering', 'income'),
 ('Faith Pledge', 'income'),
 ('Love Gift', 'income'),
-('Donation', 'income');
+('Contribution', 'income'),
+('Donation', 'income'),
+('Fundraising', 'income'),
+('Others', 'income');
 
 -- Expense Categories (Pre-defined)
 INSERT INTO `categories` (`name`, `type`) VALUES
 ('Claim', 'expense'),
 ('Administration', 'expense'),
-('Utilities', 'expense');
+('Rental', 'expense'),
+('Bills', 'expense'),
+('Salary', 'expense'),
+('Statutory', 'expense'),
+('Insurance', 'expense'),
+('Maintenance', 'expense'),
+('Outreach / Ministry', 'expense'),
+('Departmental', 'expense'),
+('Utilities', 'expense'),
+('Others', 'expense');
 
 -- Funds (Pre-defined)
 INSERT INTO `funds` (`branch_id`, `name`, `description`) VALUES
@@ -48,5 +60,4 @@ INSERT INTO `account_types` (`name`, `description`, `icon`, `color`) VALUES
 ('Petty Cash', 'Small cash fund for minor expenses', 'fa-coins', 'secondary');
 
 INSERT INTO `accounts` (`branch_id`, `name`, `account_type_id`, `account_number`, `balance`, `is_default`) VALUES
-(1, 'Main Bank Account', 1, '', 0.00, 1),
-(1, 'Petty Cash', 2, NULL, 0.00, 0);
+(1, 'Main Bank Account', 1, '', 0.00, 1);
