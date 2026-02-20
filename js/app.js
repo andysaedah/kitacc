@@ -177,6 +177,19 @@ const KiTAcc = {
                 sidebar.classList.remove('mobile-open');
             }
         });
+
+        // Restore sidebar scroll position
+        const sidebarNav = sidebar ? sidebar.querySelector('.sidebar-nav') : null;
+        if (sidebarNav) {
+            const savedScroll = sessionStorage.getItem('sidebarScrollPos');
+            if (savedScroll) {
+                sidebarNav.scrollTop = parseInt(savedScroll, 10);
+            }
+            // Save scroll position before navigating away
+            window.addEventListener('beforeunload', () => {
+                sessionStorage.setItem('sidebarScrollPos', sidebarNav.scrollTop);
+            });
+        }
     },
 
     // ========================================
