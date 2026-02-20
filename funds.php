@@ -13,7 +13,7 @@ if (isSimpleMode()) {
 }
 
 $user = getCurrentUser();
-$branchId = getActiveBranchId();
+$branchId = getActiveBranchId() ?? $user['branch_id'];
 $page_title = 'Funds - KiTAcc';
 
 try {
