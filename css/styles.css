@@ -1032,7 +1032,7 @@ textarea {
 }
 
 .stat-value {
-    font-size: 1.5rem;
+    font-size: 1.125rem;
     font-weight: 700;
     color: var(--gray-800);
     line-height: 1.2;
@@ -2319,7 +2319,7 @@ textarea.form-control {
     }
 
     .stat-value {
-        font-size: 1.25rem;
+        font-size: 1rem;
     }
 
     /* Login page on mobile */
