@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 100" fill="none">
+  <!-- BWCC Logo - Purple version (for login page/light backgrounds) -->
+  
+  <!-- Decorative circle element (right side) -->
+  <circle cx="238" cy="50" r="32" stroke="#6C2BD9" stroke-width="2.5" fill="none" opacity="0.9"/>
+  <circle cx="238" cy="50" r="26" stroke="#8B5CF6" stroke-width="1.2" fill="none" opacity="0.5"/>
+  
+  <!-- Accent swoosh inside circle -->
+  <path d="M222 38 C228 32, 248 30, 254 42 C258 50, 250 60, 238 58 C230 56, 224 48, 228 40" 
+        stroke="#A855F7" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.7"/>
+  
+  <!-- B - Stylized calligraphic -->
+  <path d="M12 82 L12 22 C12 20, 14 18, 16 18 L38 18 C52 18, 60 24, 60 34 C60 40, 56 44, 50 46 
+           C58 48, 64 54, 64 62 C64 74, 54 82, 38 82 Z
+           M28 42 L36 42 C42 42, 46 38, 46 34 C46 28, 42 26, 36 26 L28 26 Z
+           M28 74 L38 74 C46 74, 50 70, 50 64 C50 58, 46 54, 38 54 L28 54 Z" 
+        fill="#5B21B6"/>
+  <!-- B decorative swoosh -->
+  <path d="M8 16 C10 12, 16 10, 22 12" stroke="#6C2BD9" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  
+  <!-- W - Stylized calligraphic -->
+  <path d="M72 22 L86 70 L98 40 L110 70 L124 22" 
+        stroke="#6C2BD9" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- W decorative swoosh -->
+  <path d="M68 18 C72 12, 80 14, 76 20" stroke="#8B5CF6" stroke-width="2" fill="none" stroke-linecap="round"/>
+  
+  <!-- C - First, stylized calligraphic -->
+  <path d="M162 30 C154 20, 136 18, 130 32 C124 46, 128 72, 146 78 C156 82, 164 76, 166 70" 
+        stroke="#6C2BD9" stroke-width="8" fill="none" stroke-linecap="round"/>
+  <!-- C decorative swoosh -->
+  <path d="M160 16 C164 12, 170 14, 166 20" stroke="#8B5CF6" stroke-width="2" fill="none" stroke-linecap="round"/>
+  
+  <!-- C - Second, stylized calligraphic -->
+  <path d="M206 30 C198 20, 180 18, 174 32 C168 46, 172 72, 190 78 C200 82, 208 76, 210 70" 
+        stroke="#6C2BD9" stroke-width="8" fill="none" stroke-linecap="round"/>
+  <!-- CC connecting flourish -->
+  <path d="M166 70 C170 84, 178 88, 174 78" stroke="#A855F7" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.7"/>
+</svg>

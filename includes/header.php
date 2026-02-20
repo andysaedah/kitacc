@@ -19,6 +19,7 @@ $isProduction = (getenv('APP_ENV') === 'production');
         <?php echo htmlspecialchars($page_title ?? getSetting('app_name', 'KiTAcc')); ?>
     </title>
     <meta name="csrf-token" content="<?php echo generateCsrfToken(); ?>">
+    <link rel="icon" type="image/svg+xml" href="img/logo-icon-purple.svg">
 
     <!-- Google Fonts - Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">

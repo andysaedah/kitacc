@@ -101,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isAjax()) {
         <div class="login-card">
             <div class="login-header">
                 <div class="login-logo">
-                    <i class="fas fa-church"></i>
+                    <img src="img/logo-white.svg" alt="BWCC" class="login-logo-img">
                 </div>
                 <h1 class="login-title">Reset Password</h1>
                 <p class="login-subtitle">

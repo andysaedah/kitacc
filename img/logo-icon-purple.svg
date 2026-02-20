@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+  <!-- BWCC Logo Icon - Purple (favicon/light backgrounds) -->
+  <circle cx="40" cy="40" r="36" stroke="#8B5CF6" stroke-width="2" fill="none" opacity="0.3"/>
+  <path d="M22 62 L22 20 C22 18, 24 16, 26 16 L42 16 C52 16, 58 22, 58 30 C58 35, 55 38, 50 40 
+           C56 42, 62 47, 62 54 C62 64, 54 68, 42 68 L26 68 C24 68, 22 66, 22 64 Z
+           M34 36 L40 36 C44 36, 48 33, 48 29 C48 25, 44 22, 40 22 L34 22 Z
+           M34 62 L42 62 C48 62, 52 58, 52 53 C52 48, 48 44, 42 44 L34 44 Z" 
+        fill="#6C2BD9"/>
+  <path d="M18 14 C20 10, 26 8, 32 10" stroke="#8B5CF6" stroke-width="2" fill="none" stroke-linecap="round"/>
+</svg>
