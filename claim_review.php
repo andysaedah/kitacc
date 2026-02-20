@@ -2,6 +2,7 @@
 /**
  * KiTAcc - Review Claims
  * Branch Finance / Admin Finance review pending claims
+ * Tabs: Pending | Approved/Paid | Rejected
  */
 require_once __DIR__ . '/includes/config.php';
 requireLogin();
@@ -11,53 +12,75 @@ $user = getCurrentUser();
 $branchId = getActiveBranchId();
 $page_title = 'Review Claims - KiTAcc';
 
+// Active tab from URL (defaults to pending)
+$activeStatus = $_GET['status'] ?? 'pending';
+if (!in_array($activeStatus, ['pending', 'approved', 'rejected'])) {
+    $activeStatus = 'pending';
+}
+
 try {
     $pdo = db();
-    $sql = "SELECT cl.*, c.name AS category_name, u.name AS submitted_by_name
-            FROM claims cl
-            LEFT JOIN categories c ON cl.category_id = c.id
-            LEFT JOIN users u ON cl.submitted_by = u.id
-            WHERE 1=1";
-    $params = [];
+
+    // Branch filter helper
+    $branchWhere = '';
+    $branchParams = [];
     if ($branchId !== null) {
-        $sql .= " AND cl.branch_id = ?";
-        $params[] = $branchId;
+        $branchWhere = ' AND cl.branch_id = ?';
+        $branchParams = [$branchId];
     }
-    // Count total claims for review
-    $countSql = "SELECT COUNT(*) FROM claims cl WHERE 1=1";
-    $countParams = [];
-    if ($branchId !== null) {
-        $countSql .= " AND cl.branch_id = ?";
-        $countParams[] = $branchId;
-    }
+
+    // Count per status (single query, no performance penalty)
+    $countSql = "SELECT 
+        SUM(cl.status = 'pending') AS pending_count,
+        SUM(cl.status = 'approved') AS approved_count,
+        SUM(cl.status = 'rejected') AS rejected_count
+        FROM claims cl WHERE 1=1" . $branchWhere;
     $countStmt = $pdo->prepare($countSql);
-    $countStmt->execute($countParams);
-    $totalRecords = (int) $countStmt->fetchColumn();
+    $countStmt->execute($branchParams);
+    $counts = $countStmt->fetch();
+    $pendingCount = (int) ($counts['pending_count'] ?? 0);
+    $approvedCount = (int) ($counts['approved_count'] ?? 0);
+    $rejectedCount = (int) ($counts['rejected_count'] ?? 0);
+
+    // Fetch claims for active tab only
+    $totalRecords = match ($activeStatus) {
+        'approved' => $approvedCount,
+        'rejected' => $rejectedCount,
+        default => $pendingCount,
+    };
 
     $currentPage = max(1, intval($_GET['page'] ?? 1));
     $pager = paginate($totalRecords, $currentPage, 25);
 
-    $sql .= " ORDER BY FIELD(cl.status, 'pending', 'approved', 'rejected'), cl.created_at DESC LIMIT ? OFFSET ?";
-    $params[] = $pager['per_page'];
-    $params[] = $pager['offset'];
+    $sql = "SELECT cl.*, c.name AS category_name, u.name AS submitted_by_name
+            FROM claims cl
+            LEFT JOIN categories c ON cl.category_id = c.id
+            LEFT JOIN users u ON cl.submitted_by = u.id
+            WHERE cl.status = ?" . $branchWhere . "
+            ORDER BY cl.created_at DESC LIMIT ? OFFSET ?";
+    $params = array_merge([$activeStatus], $branchParams, [$pager['per_page'], $pager['offset']]);
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $claims = $stmt->fetchAll();
 
-    // Accounts for approval
-    $sql = "SELECT id, name FROM accounts WHERE is_active = 1";
-    $params = [];
-    if ($branchId !== null) {
-        $sql .= " AND branch_id = ?";
-        $params[] = $branchId;
+    // Accounts for approval (only needed on pending tab)
+    $accounts = [];
+    if ($activeStatus === 'pending') {
+        $sql = "SELECT id, name FROM accounts WHERE is_active = 1";
+        $params = [];
+        if ($branchId !== null) {
+            $sql .= " AND branch_id = ?";
+            $params[] = $branchId;
+        }
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $accounts = $stmt->fetchAll();
     }
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $accounts = $stmt->fetchAll();
 
 } catch (Exception $e) {
     $claims = [];
     $accounts = [];
+    $pendingCount = $approvedCount = $rejectedCount = 0;
 }
 
 include __DIR__ . '/includes/header.php';
@@ -70,13 +93,48 @@ include __DIR__ . '/includes/header.php';
     </div>
 </div>
 
+<!-- Status Tabs -->
+<div style="margin-bottom: 1.5rem;">
+    <div class="tabs">
+        <a href="claim_review.php?status=pending" class="tab <?php echo $activeStatus === 'pending' ? 'active' : ''; ?>" style="text-decoration: none;">
+            <i class="fas fa-hourglass-half" style="margin-right: 0.375rem;"></i>Pending
+            <?php if ($pendingCount > 0): ?>
+                <span class="badge badge-warning" style="margin-left: 0.375rem; font-size: 0.7rem;"><?php echo $pendingCount; ?></span>
+            <?php endif; ?>
+        </a>
+        <a href="claim_review.php?status=approved" class="tab <?php echo $activeStatus === 'approved' ? 'active' : ''; ?>" style="text-decoration: none;">
+            <i class="fas fa-check-circle" style="margin-right: 0.375rem;"></i>Approved / Paid
+            <?php if ($approvedCount > 0): ?>
+                <span class="badge badge-success" style="margin-left: 0.375rem; font-size: 0.7rem;"><?php echo $approvedCount; ?></span>
+            <?php endif; ?>
+        </a>
+        <a href="claim_review.php?status=rejected" class="tab <?php echo $activeStatus === 'rejected' ? 'active' : ''; ?>" style="text-decoration: none;">
+            <i class="fas fa-times-circle" style="margin-right: 0.375rem;"></i>Rejected
+            <?php if ($rejectedCount > 0): ?>
+                <span class="badge badge-danger" style="margin-left: 0.375rem; font-size: 0.7rem;"><?php echo $rejectedCount; ?></span>
+            <?php endif; ?>
+        </a>
+    </div>
+</div>
+
 <!-- Claims List -->
 <?php if (empty($claims)): ?>
     <div class="card">
         <div class="card-body">
-            <div class="empty-state"><i class="fas fa-clipboard-check"></i>
-                <h3>No Claims to Review</h3>
-                <p>There are no pending claims at this time.</p>
+            <div class="empty-state">
+                <?php if ($activeStatus === 'pending'): ?>
+                    <i class="fas fa-clipboard-check"></i>
+                    <h3>No Pending Claims</h3>
+                    <p>There are no claims waiting for review.</p>
+                <?php elseif ($activeStatus === 'approved'): ?>
+                    <i class="fas fa-check-circle"></i>
+                    <h3>No Approved Claims</h3>
+                    <p>No claims have been approved yet.</p>
+                <?php else: ?>
+                    <i class="fas fa-times-circle"></i>
+                    <h3>No Rejected Claims</h3>
+                    <p>No claims have been rejected.</p>
+                <?php endif; ?>
             </div>
         </div>
     </div>
