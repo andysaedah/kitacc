@@ -86,17 +86,15 @@ $userRole = $user['role'] ?? '';
             </div>
         <?php endif; ?>
 
-        <!-- Management -->
-        <?php if (hasRole(ROLE_BRANCH_FINANCE)): ?>
+        <!-- Management (Fund mode only) -->
+        <?php if (hasRole(ROLE_BRANCH_FINANCE) && isFundMode()): ?>
             <div class="nav-section">
                 <div class="nav-section-title">Management</div>
 
-                <?php if (isFundMode()): ?>
-                    <a href="funds.php" class="nav-item <?php echo $currentPage === 'funds' ? 'active' : ''; ?>" aria-label="Funds">
-                        <i class="fas fa-piggy-bank" aria-hidden="true"></i>
-                        <span class="nav-item-text">Funds</span>
-                    </a>
-                <?php endif; ?>
+                <a href="funds.php" class="nav-item <?php echo $currentPage === 'funds' ? 'active' : ''; ?>" aria-label="Funds">
+                    <i class="fas fa-piggy-bank" aria-hidden="true"></i>
+                    <span class="nav-item-text">Funds</span>
+                </a>
             </div>
         <?php endif; ?>
 
