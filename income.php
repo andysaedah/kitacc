@@ -16,7 +16,7 @@ try {
     $pdo = db();
 
     // Accounts
-    $sql = "SELECT id, name, type FROM accounts WHERE is_active = 1";
+    $sql = "SELECT id, name FROM accounts WHERE is_active = 1";
     $params = [];
     if ($branchId !== null) {
         $sql .= " AND branch_id = ?";
@@ -86,6 +86,7 @@ try {
     $categories = [];
     $funds = [];
     $incomeList = [];
+    $pager = paginate(0, 1, 25);
 }
 
 include __DIR__ . '/includes/header.php';
