@@ -1,16 +1,11 @@
 <?php
 /**
- * KiTAcc - Funds Management (Fund Accounting Mode only)
+ * KiTAcc - Funds Management
  * Fund balance cards, inter-fund transfers, transfer history
  */
 require_once __DIR__ . '/includes/config.php';
 requireLogin();
 requireRole(ROLE_BRANCH_FINANCE);
-
-if (isSimpleMode()) {
-    header('Location: dashboard.php');
-    exit;
-}
 
 $user = getCurrentUser();
 $branchId = getActiveBranchId();

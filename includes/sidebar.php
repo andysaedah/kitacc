@@ -91,17 +91,10 @@ $userRole = $user['role'] ?? '';
             <div class="nav-section">
                 <div class="nav-section-title">Management</div>
 
-                <a href="accounts.php" class="nav-item <?php echo $currentPage === 'accounts' ? 'active' : ''; ?>" aria-label="Accounts">
-                    <i class="fas fa-university" aria-hidden="true"></i>
-                    <span class="nav-item-text">Accounts</span>
+                <a href="funds.php" class="nav-item <?php echo $currentPage === 'funds' ? 'active' : ''; ?>" aria-label="Funds">
+                    <i class="fas fa-piggy-bank" aria-hidden="true"></i>
+                    <span class="nav-item-text">Funds</span>
                 </a>
-
-                <?php if (isFundMode()): ?>
-                    <a href="funds.php" class="nav-item <?php echo $currentPage === 'funds' ? 'active' : ''; ?>" aria-label="Funds">
-                        <i class="fas fa-piggy-bank" aria-hidden="true"></i>
-                        <span class="nav-item-text">Funds</span>
-                    </a>
-                <?php endif; ?>
             </div>
         <?php endif; ?>
 
@@ -140,6 +133,11 @@ $userRole = $user['role'] ?? '';
                 <a href="categories.php" class="nav-item <?php echo $currentPage === 'categories' ? 'active' : ''; ?>" aria-label="Categories">
                     <i class="fas fa-tags" aria-hidden="true"></i>
                     <span class="nav-item-text">Categories</span>
+                </a>
+
+                <a href="accounts.php" class="nav-item <?php echo $currentPage === 'accounts' ? 'active' : ''; ?>" aria-label="Accounts">
+                    <i class="fas fa-university" aria-hidden="true"></i>
+                    <span class="nav-item-text">Accounts</span>
                 </a>
 
                 <a href="account_types.php" class="nav-item <?php echo $currentPage === 'account_types' ? 'active' : ''; ?>" aria-label="Account Types">

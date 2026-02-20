@@ -5,7 +5,7 @@
  */
 require_once __DIR__ . '/includes/config.php';
 requireLogin();
-requireRole(ROLE_BRANCH_FINANCE);
+requireRole(ROLE_SUPERADMIN);
 
 $user = getCurrentUser();
 $branchId = getActiveBranchId();
@@ -29,12 +29,10 @@ try {
     $stmt->execute($params);
     $accountList = $stmt->fetchAll();
 
-    // Branches for dropdown (superadmin)
+    // Branches for dropdown
     $branches = [];
-    if ($user['role'] === ROLE_SUPERADMIN) {
-        $stmt = $pdo->query("SELECT id, name FROM branches WHERE is_active = 1 ORDER BY name");
-        $branches = $stmt->fetchAll();
-    }
+    $stmt = $pdo->query("SELECT id, name FROM branches WHERE is_active = 1 ORDER BY name");
+    $branches = $stmt->fetchAll();
 
     // Account types for dropdown
     $accountTypes = [];
@@ -58,9 +56,7 @@ include __DIR__ . '/includes/header.php';
         <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--gray-800);">Accounts</h1>
         <p class="text-muted">Manage bank accounts</p>
     </div>
-    <?php if ($user['role'] === ROLE_SUPERADMIN): ?>
-        <button class="btn btn-primary" onclick="openAddAccount()"><i class="fas fa-plus"></i> Add Account</button>
-    <?php endif; ?>
+    <button class="btn btn-primary" onclick="openAddAccount()"><i class="fas fa-plus"></i> Add Account</button>
 </div>
 
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -111,7 +107,7 @@ include __DIR__ . '/includes/header.php';
                             <button class="btn btn-sm btn-ghost"
                                 onclick="editAccount(<?php echo $acc['id']; ?>, '<?php echo htmlspecialchars(addslashes($acc['name'])); ?>', '<?php echo htmlspecialchars(addslashes($acc['account_number'] ?? '')); ?>', '<?php echo $acc['account_type_id'] ?? ''; ?>')"><i
                                     class="fas fa-edit"></i></button>
-                            <?php if ($user['role'] === ROLE_SUPERADMIN && !$acc['is_default']): ?>
+                            <?php if (!$acc['is_default']): ?>
                                 <button class="btn btn-sm btn-ghost text-danger" onclick="deleteAccount(<?php echo $acc['id']; ?>)"><i
                                         class="fas fa-trash"></i></button>
                             <?php endif; ?>
@@ -127,24 +123,22 @@ include __DIR__ . '/includes/header.php';
 <div class="modal-overlay" id="addAccountModal">
     <div class="modal">
         <div class="modal-header">
-            <h3 class="modal-title" id="accountModalTitle"><?php echo $user['role'] === ROLE_SUPERADMIN ? 'Add Account' : 'Rename Account'; ?></h3>
+            <h3 class="modal-title" id="accountModalTitle">Add Account</h3>
             <button class="modal-close"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-body">
             <form id="accountForm">
                 <input type="hidden" id="accountId" name="id" value="">
-                <?php if ($user['role'] === ROLE_SUPERADMIN): ?>
-                    <?php if (!empty($branches)): ?>
-                        <div class="form-group" id="branchGroup">
-                            <label class="form-label required">Branch</label>
-                            <select name="branch_id" class="form-control" required>
-                                <option value="">Select Branch</option>
-                                <?php foreach ($branches as $br): ?>
-                                    <option value="<?php echo $br['id']; ?>"><?php echo htmlspecialchars($br['name']); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                    <?php endif; ?>
+                <?php if (!empty($branches)): ?>
+                    <div class="form-group" id="branchGroup">
+                        <label class="form-label required">Branch</label>
+                        <select name="branch_id" class="form-control" required>
+                            <option value="">Select Branch</option>
+                            <?php foreach ($branches as $br): ?>
+                                <option value="<?php echo $br['id']; ?>"><?php echo htmlspecialchars($br['name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                 <?php endif; ?>
                 <div class="form-group">
                     <label class="form-label required">Account Name</label>
@@ -180,16 +174,13 @@ include __DIR__ . '/includes/header.php';
 </div>
 
 <?php
-$isSuperadmin = $user['role'] === ROLE_SUPERADMIN ? 'true' : 'false';
-$page_scripts = "<script>var IS_SUPERADMIN = {$isSuperadmin};</script>";
-$page_scripts .= <<<'SCRIPT'
+$page_scripts = <<<'SCRIPT'
 <script>
     function openAddAccount() {
         document.getElementById('accountId').value = '';
         document.getElementById('accountModalTitle').textContent = 'Add Account';
         document.getElementById('accountForm').reset();
-        var balGroup = document.getElementById('startingBalanceGroup');
-        if (balGroup) balGroup.style.display = '';
+        document.getElementById('startingBalanceGroup').style.display = '';
         KiTAcc.openModal('addAccountModal');
     }
     function submitAccount() {
@@ -203,18 +194,13 @@ $page_scripts .= <<<'SCRIPT'
     }
     function editAccount(id, name, accNum, accountTypeId) {
         document.getElementById('accountId').value = id;
-        document.getElementById('accountModalTitle').textContent = IS_SUPERADMIN ? 'Edit Account' : 'Rename Account';
+        document.getElementById('accountModalTitle').textContent = 'Edit Account';
         var form = document.getElementById('accountForm');
         form.querySelector('[name="name"]').value = name;
-        if (IS_SUPERADMIN) {
-            var accNumField = form.querySelector('[name="account_number"]');
-            if (accNumField) accNumField.value = accNum;
-            var typeField = form.querySelector('[name="account_type_id"]');
-            if (typeField) typeField.value = accountTypeId || '';
-            // Hide starting balance when editing
-            var balGroup = document.getElementById('startingBalanceGroup');
-            if (balGroup) balGroup.style.display = 'none';
-        }
+        form.querySelector('[name="account_number"]').value = accNum;
+        form.querySelector('[name="account_type_id"]').value = accountTypeId || '';
+        // Hide starting balance when editing
+        document.getElementById('startingBalanceGroup').style.display = 'none';
         KiTAcc.openModal('addAccountModal');
     }
     function deleteAccount(id) {
