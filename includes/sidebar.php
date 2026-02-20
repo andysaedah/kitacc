@@ -91,10 +91,12 @@ $userRole = $user['role'] ?? '';
             <div class="nav-section">
                 <div class="nav-section-title">Management</div>
 
-                <a href="funds.php" class="nav-item <?php echo $currentPage === 'funds' ? 'active' : ''; ?>" aria-label="Funds">
-                    <i class="fas fa-piggy-bank" aria-hidden="true"></i>
-                    <span class="nav-item-text">Funds</span>
-                </a>
+                <?php if (isFundMode()): ?>
+                    <a href="funds.php" class="nav-item <?php echo $currentPage === 'funds' ? 'active' : ''; ?>" aria-label="Funds">
+                        <i class="fas fa-piggy-bank" aria-hidden="true"></i>
+                        <span class="nav-item-text">Funds</span>
+                    </a>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
 
