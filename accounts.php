@@ -1,7 +1,7 @@
 <?php
 /**
  * KiTAcc - Accounts Management
- * Bank / Petty Cash account CRUD with activate/deactivate
+ * Bank account CRUD with activate/deactivate
  */
 require_once __DIR__ . '/includes/config.php';
 requireLogin();
@@ -56,7 +56,7 @@ include __DIR__ . '/includes/header.php';
 <div class="d-flex justify-between align-center mb-6">
     <div>
         <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--gray-800);">Accounts</h1>
-        <p class="text-muted">Manage bank accounts and petty cash</p>
+        <p class="text-muted">Manage bank accounts</p>
     </div>
     <?php if ($user['role'] === ROLE_SUPERADMIN): ?>
         <button class="btn btn-primary" onclick="openAddAccount()"><i class="fas fa-plus"></i> Add Account</button>
@@ -69,7 +69,7 @@ include __DIR__ . '/includes/header.php';
             <div class="card-body">
                 <div class="empty-state"><i class="fas fa-university"></i>
                     <h3>No Accounts</h3>
-                    <p>Add your first bank account or petty cash.</p>
+                    <p>Add your first bank account.</p>
                 </div>
             </div>
         </div>

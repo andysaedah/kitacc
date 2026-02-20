@@ -157,7 +157,7 @@ include __DIR__ . '/includes/header.php';
         <div
             style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
             <div>
-                <span class="text-muted" style="font-size: 0.75rem;">Total Accounts (Bank + Petty Cash)</span>
+                <span class="text-muted" style="font-size: 0.75rem;">Total Account Balances</span>
                 <div class="font-semibold" style="font-size: 1rem;"><?php echo formatCurrency($totalAccounts); ?></div>
             </div>
             <div>

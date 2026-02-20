@@ -56,13 +56,12 @@ INSERT INTO `categories` (`name`, `type`) VALUES
 -- Funds (Pre-defined)
 INSERT INTO `funds` (`branch_id`, `name`, `description`) VALUES
 (1, 'General Fund', 'Default unallocated fund'),
-(1, 'Mission', 'Mission fund for outreach and missionary work');
+(1, 'Mission', 'Mission fund for outreach and missionary work'),
+(1, 'Petty Cash', 'Small cash fund for minor day-to-day expenses');
 
--- Default Account for Main Branch
+-- Default Account Types
 INSERT INTO `account_types` (`name`, `description`, `icon`, `color`) VALUES
-('Bank Account', 'Standard bank account for deposits and withdrawals', 'fa-university', 'primary'),
-('Petty Cash', 'Small cash fund for minor expenses', 'fa-coins', 'secondary');
+('Bank Account', 'Standard bank account for deposits and withdrawals', 'fa-university', 'primary');
 
 INSERT INTO `accounts` (`branch_id`, `name`, `account_type_id`, `account_number`, `balance`, `is_default`) VALUES
-(1, 'Main Bank Account', 1, '', 0.00, 1),
-(1, 'Petty Cash', 2, '', 0.00, 0);
+(1, 'Main Bank Account', 1, '', 0.00, 1);
