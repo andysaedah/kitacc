@@ -141,8 +141,9 @@ include __DIR__ . '/includes/header.php';
                 </div>
             </div>
 
-            <div style="margin-top: 1.5rem;">
+            <div style="margin-top: 1.5rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
                 <button type="submit" class="btn btn-primary"><i class="fas fa-print"></i> Generate Report</button>
+                <button type="button" class="btn btn-secondary" onclick="generateChart()"><i class="fas fa-chart-bar"></i> Visual Chart</button>
             </div>
         </form>
     </div>
@@ -191,6 +192,39 @@ $page_scripts = <<<'SCRIPT'
 
         window.open('report_view.php?' + params.toString(), '_blank');
         return false;
+    }
+
+    function generateChart() {
+        const form = document.getElementById('reportForm');
+        const type = form.querySelector('[name="report_type"]').value;
+        const periodType = form.querySelector('input[name="period_type"]:checked').value;
+        const branchEl = form.querySelector('[name="branch_id"]');
+
+        let params = new URLSearchParams();
+        params.set('type', type);
+
+        if (branchEl) params.set('branch_id', branchEl.value);
+
+        if (periodType === 'monthly') {
+            const m = form.querySelector('[name="month"]').value;
+            const y = form.querySelector('[name="year"]').value;
+            params.set('month', m);
+            params.set('year', y);
+        } else if (periodType === 'yearly') {
+            const y = form.querySelector('[name="full_year"]').value;
+            params.set('year', y);
+        } else {
+            const from = form.querySelector('[name="date_from"]').value;
+            const to = form.querySelector('[name="date_to"]').value;
+            if (!from || !to) {
+                KiTAcc.toast('Please select start and end dates.', 'error');
+                return;
+            }
+            params.set('date_from', from);
+            params.set('date_to', to);
+        }
+
+        window.open('report_chart.php?' + params.toString(), '_blank');
     }
 </script>
 SCRIPT;
