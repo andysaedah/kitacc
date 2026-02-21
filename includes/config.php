@@ -129,8 +129,8 @@ function requireRole(string $minimumRole): void
             echo json_encode(['success' => false, 'message' => 'Access denied.']);
             exit;
         }
-        http_response_code(403);
-        die('<h1>403 - Access Denied</h1><p>You do not have permission to access this page.</p>');
+        include __DIR__ . '/../403.php';
+        exit;
     }
 }
 
@@ -188,7 +188,8 @@ function requireCsrf(): void
             echo json_encode(['success' => false, 'message' => 'Invalid security token. Please refresh the page.']);
             exit;
         }
-        die('Invalid security token.');
+        include __DIR__ . '/../403.php';
+        exit;
     }
 }
 
