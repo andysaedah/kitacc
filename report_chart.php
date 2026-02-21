@@ -158,6 +158,66 @@ foreach ($categoryRows as $cr) {
     }
 }
 
+// ========================================
+// CLAIMS DATA FOR CHARTS
+// ========================================
+$claimBranchFilter = $branchId ? 'AND cl.branch_id = ?' : '';
+$claimBranchParams = $branchId ? [$branchId] : [];
+
+// Claims by status totals
+$clSumSql = "SELECT cl.status, COUNT(*) AS cnt, SUM(cl.amount) AS total
+             FROM claims cl
+             WHERE cl.created_at BETWEEN ? AND ?
+             {$claimBranchFilter}
+             GROUP BY cl.status";
+$clSumStmt = $pdo->prepare($clSumSql);
+$clSumStmt->execute(array_merge([$startDate, $endDate . ' 23:59:59'], $claimBranchParams));
+$claimStatusData = ['pending' => 0, 'approved' => 0, 'rejected' => 0];
+foreach ($clSumStmt->fetchAll() as $cs) {
+    $claimStatusData[$cs['status']] = floatval($cs['total']);
+}
+
+// Claims monthly by status
+$clMonthSql = "SELECT cl.status,
+                 DATE_FORMAT(cl.created_at, '%Y-%c') AS ym,
+                 SUM(cl.amount) AS total
+               FROM claims cl
+               WHERE cl.created_at BETWEEN ? AND ?
+               {$claimBranchFilter}
+               GROUP BY cl.status, ym
+               ORDER BY ym";
+$clMonthStmt = $pdo->prepare($clMonthSql);
+$clMonthStmt->execute(array_merge([$startDate, $endDate . ' 23:59:59'], $claimBranchParams));
+$claimMonthlyChart = ['pending' => [], 'approved' => [], 'rejected' => []];
+foreach ($clMonthStmt->fetchAll() as $cm) {
+    $claimMonthlyChart[$cm['status']][$cm['ym']] = floatval($cm['total']);
+}
+
+// Build claims arrays for Chart.js
+$claimPendingValues = [];
+$claimApprovedValues = [];
+$claimRejectedValues = [];
+foreach ($monthColumns as $mc) {
+    $claimPendingValues[] = $claimMonthlyChart['pending'][$mc['key']] ?? 0;
+    $claimApprovedValues[] = $claimMonthlyChart['approved'][$mc['key']] ?? 0;
+    $claimRejectedValues[] = $claimMonthlyChart['rejected'][$mc['key']] ?? 0;
+}
+
+// Claims by category
+$clCatSql = "SELECT c.name AS category_name, SUM(cl.amount) AS total
+             FROM claims cl
+             LEFT JOIN categories c ON cl.category_id = c.id
+             WHERE cl.created_at BETWEEN ? AND ?
+             {$claimBranchFilter}
+             GROUP BY c.name
+             ORDER BY total DESC";
+$clCatStmt = $pdo->prepare($clCatSql);
+$clCatStmt->execute(array_merge([$startDate, $endDate . ' 23:59:59'], $claimBranchParams));
+$claimCats = [];
+foreach ($clCatStmt->fetchAll() as $cc) {
+    $claimCats[$cc['category_name'] ?: 'Uncategorized'] = floatval($cc['total']);
+}
+
 // JSON encode for JS
 $jsLabels    = json_encode($labels);
 $jsIncome    = json_encode($incomeValues);
@@ -166,6 +226,16 @@ $jsIncCats   = json_encode(array_keys($incomeCategories));
 $jsIncCatVal = json_encode(array_values($incomeCategories));
 $jsExpCats   = json_encode(array_keys($expenseCategories));
 $jsExpCatVal = json_encode(array_values($expenseCategories));
+
+// Claims JSON
+$jsClaimStatusLabels = json_encode(['Pending', 'Approved', 'Rejected']);
+$jsClaimStatusValues = json_encode(array_values($claimStatusData));
+$jsClaimPending  = json_encode($claimPendingValues);
+$jsClaimApproved = json_encode($claimApprovedValues);
+$jsClaimRejected = json_encode($claimRejectedValues);
+$jsClaimCatLabels = json_encode(array_keys($claimCats));
+$jsClaimCatValues = json_encode(array_values($claimCats));
+$isClaimsReport = ($reportType === 'claims') ? 'true' : 'false';
 
 // Branch chart data for stacked charts
 $jsBranchData = json_encode($branchChartData);
@@ -329,64 +399,123 @@ $totalIncome  = array_sum($incomeValues);
 $totalExpense = array_sum($expenseValues);
 $netBalance   = $totalIncome - $totalExpense;
 ?>
-<div class="summary-stats">
-    <div class="stat-card stat-income">
-        <div class="stat-label">Total Income</div>
-        <div class="stat-value">RM <?php echo number_format($totalIncome, 2); ?></div>
-    </div>
-    <div class="stat-card stat-expense">
-        <div class="stat-label">Total Expenses</div>
-        <div class="stat-value">RM <?php echo number_format($totalExpense, 2); ?></div>
-    </div>
-    <div class="stat-card stat-balance">
-        <div class="stat-label">Net <?php echo $netBalance >= 0 ? 'Surplus' : 'Deficit'; ?></div>
-        <div class="stat-value">RM <?php echo number_format($netBalance, 2); ?></div>
-    </div>
-</div>
 
-<div class="charts-grid">
-    <!-- 1. Bar Chart: Income vs Expenses -->
-    <div class="chart-card">
-        <h3>&#x1F4CA; Income vs Expenses (Bar Chart)</h3>
-        <div class="chart-container">
-            <canvas id="barChart"></canvas>
+<?php if ($reportType === 'claims'): ?>
+    <!-- CLAIMS SUMMARY STATS -->
+    <div class="summary-stats">
+        <div class="stat-card" style="border-left: 4px solid #d69e2e;">
+            <div class="stat-label">Pending</div>
+            <div class="stat-value" style="color: #d69e2e;">RM <?php echo number_format($claimStatusData['pending'], 2); ?></div>
+        </div>
+        <div class="stat-card stat-income">
+            <div class="stat-label">Approved</div>
+            <div class="stat-value">RM <?php echo number_format($claimStatusData['approved'], 2); ?></div>
+        </div>
+        <div class="stat-card stat-expense">
+            <div class="stat-label">Rejected</div>
+            <div class="stat-value">RM <?php echo number_format($claimStatusData['rejected'], 2); ?></div>
+        </div>
+        <div class="stat-card stat-balance">
+            <div class="stat-label">Total Claims</div>
+            <div class="stat-value">RM <?php echo number_format(array_sum($claimStatusData), 2); ?></div>
         </div>
     </div>
 
-    <!-- 2. Trend Line Chart -->
-    <div class="chart-card">
-        <h3>&#x1F4C8; Income &amp; Expenses Trend</h3>
-        <div class="chart-container">
-            <canvas id="trendChart"></canvas>
-        </div>
-    </div>
-
-    <!-- 3. Category Breakdown (Doughnut Charts) -->
-    <div class="half-grid">
+    <div class="charts-grid">
+        <!-- 1. Bar Chart: Claims by Status per Month -->
         <div class="chart-card">
-            <h3>&#x1F4B0; Income by Category</h3>
+            <h3>&#x1F4CA; Claims by Status (Bar Chart)</h3>
             <div class="chart-container">
-                <canvas id="incomePieChart"></canvas>
+                <canvas id="claimBarChart"></canvas>
             </div>
         </div>
+
+        <!-- 2. Trend Line Chart: Claims over Time -->
         <div class="chart-card">
-            <h3>&#x1F4B8; Expenses by Category</h3>
+            <h3>&#x1F4C8; Claims Trend</h3>
             <div class="chart-container">
-                <canvas id="expensePieChart"></canvas>
+                <canvas id="claimTrendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 3. Claims Breakdown -->
+        <div class="half-grid">
+            <div class="chart-card">
+                <h3>&#x1F4CB; Claims by Status</h3>
+                <div class="chart-container">
+                    <canvas id="claimStatusPie"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>&#x1F4B8; Claims by Category</h3>
+                <div class="chart-container">
+                    <canvas id="claimCatPie"></canvas>
+                </div>
             </div>
         </div>
     </div>
 
-    <?php if (!empty($branchChartData) && count($branchChartData) > 1): ?>
-    <!-- 4. Branch Comparison -->
-    <div class="chart-card">
-        <h3>&#x1F3E2; Branch Comparison (Net Income)</h3>
-        <div class="chart-container">
-            <canvas id="branchChart"></canvas>
+<?php else: ?>
+    <!-- INCOME / EXPENSES SUMMARY STATS -->
+    <div class="summary-stats">
+        <div class="stat-card stat-income">
+            <div class="stat-label">Total Income</div>
+            <div class="stat-value">RM <?php echo number_format($totalIncome, 2); ?></div>
+        </div>
+        <div class="stat-card stat-expense">
+            <div class="stat-label">Total Expenses</div>
+            <div class="stat-value">RM <?php echo number_format($totalExpense, 2); ?></div>
+        </div>
+        <div class="stat-card stat-balance">
+            <div class="stat-label">Net <?php echo $netBalance >= 0 ? 'Surplus' : 'Deficit'; ?></div>
+            <div class="stat-value">RM <?php echo number_format($netBalance, 2); ?></div>
         </div>
     </div>
-    <?php endif; ?>
-</div>
+
+    <div class="charts-grid">
+        <!-- 1. Bar Chart: Income vs Expenses -->
+        <div class="chart-card">
+            <h3>&#x1F4CA; Income vs Expenses (Bar Chart)</h3>
+            <div class="chart-container">
+                <canvas id="barChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 2. Trend Line Chart -->
+        <div class="chart-card">
+            <h3>&#x1F4C8; Income &amp; Expenses Trend</h3>
+            <div class="chart-container">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 3. Category Breakdown (Doughnut Charts) -->
+        <div class="half-grid">
+            <div class="chart-card">
+                <h3>&#x1F4B0; Income by Category</h3>
+                <div class="chart-container">
+                    <canvas id="incomePieChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>&#x1F4B8; Expenses by Category</h3>
+                <div class="chart-container">
+                    <canvas id="expensePieChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <?php if (!empty($branchChartData) && count($branchChartData) > 1): ?>
+        <!-- 4. Branch Comparison -->
+        <div class="chart-card">
+            <h3>&#x1F3E2; Branch Comparison (Net Income)</h3>
+            <div class="chart-container">
+                <canvas id="branchChart"></canvas>
+            </div>
+        </div>
+        <?php endif; ?>
+    </div>
+<?php endif; ?>
 
 <script>
 (function() {
@@ -407,11 +536,19 @@ $netBalance   = $totalIncome - $totalExpense;
     const branchData = <?php echo $jsBranchData; ?>;
     const monthKeys  = <?php echo $jsMonthKeys; ?>;
 
+    const isClaims = <?php echo $isClaimsReport; ?>;
+
     // Color palette
     const incomeColor   = '#38a169';
     const incomeColorBg = 'rgba(56, 161, 105, 0.7)';
     const expenseColor   = '#e53e3e';
     const expenseColorBg = 'rgba(229, 62, 62, 0.7)';
+    const pendingColor   = '#d69e2e';
+    const pendingColorBg = 'rgba(214, 158, 46, 0.7)';
+    const approvedColor   = '#38a169';
+    const approvedColorBg = 'rgba(56, 161, 105, 0.7)';
+    const rejectedColor   = '#e53e3e';
+    const rejectedColorBg = 'rgba(229, 62, 62, 0.7)';
     const palette = [
         '#6C2BD9','#38a169','#e53e3e','#3182ce','#d69e2e',
         '#dd6b20','#319795','#805ad5','#d53f8c','#2b6cb0',
@@ -445,106 +582,7 @@ $netBalance   = $totalIncome - $totalExpense;
         }
     };
 
-    // ========== 1. Bar Chart ==========
-    const barOpts = JSON.parse(JSON.stringify(commonOpts));
-    barOpts.plugins.datalabels = {
-        display: true,
-        anchor: 'end',
-        align: 'end',
-        offset: 2,
-        font: { size: 10, weight: '600' },
-        color: '#2d3748',
-        formatter: function(v) {
-            if (v === 0) return '';
-            return 'RM ' + v.toLocaleString('en-MY', {minimumFractionDigits: 0, maximumFractionDigits: 0});
-        }
-    };
-    new Chart(document.getElementById('barChart'), {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'Income',
-                    data: incomeData,
-                    backgroundColor: incomeColorBg,
-                    borderColor: incomeColor,
-                    borderWidth: 2,
-                    borderRadius: 4
-                },
-                {
-                    label: 'Expenses',
-                    data: expenseData,
-                    backgroundColor: expenseColorBg,
-                    borderColor: expenseColor,
-                    borderWidth: 2,
-                    borderRadius: 4
-                }
-            ]
-        },
-        options: barOpts
-    });
-
-    // ========== 2. Trend Chart ==========
-    const trendOpts = JSON.parse(JSON.stringify(commonOpts));
-    trendOpts.plugins.tooltip = {
-        callbacks: {
-            label: function(ctx) {
-                return ctx.dataset.label + ': RM ' + ctx.parsed.y.toLocaleString('en-MY', {minimumFractionDigits: 2});
-            }
-        }
-    };
-    trendOpts.plugins.datalabels = {
-        display: true,
-        anchor: 'end',
-        align: 'top',
-        offset: 4,
-        font: { size: 10, weight: '600' },
-        color: function(ctx) {
-            return ctx.dataset.borderColor;
-        },
-        formatter: function(v) {
-            if (v === 0) return '';
-            return 'RM ' + v.toLocaleString('en-MY', {minimumFractionDigits: 0, maximumFractionDigits: 0});
-        }
-    };
-    trendOpts.interaction = { intersect: false, mode: 'index' };
-
-    new Chart(document.getElementById('trendChart'), {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'Income',
-                    data: incomeData,
-                    borderColor: incomeColor,
-                    backgroundColor: 'rgba(56, 161, 105, 0.1)',
-                    borderWidth: 3,
-                    pointRadius: 5,
-                    pointHoverRadius: 7,
-                    pointBackgroundColor: incomeColor,
-                    fill: true,
-                    tension: 0.3
-                },
-                {
-                    label: 'Expenses',
-                    data: expenseData,
-                    borderColor: expenseColor,
-                    backgroundColor: 'rgba(229, 62, 62, 0.1)',
-                    borderWidth: 3,
-                    pointRadius: 5,
-                    pointHoverRadius: 7,
-                    pointBackgroundColor: expenseColor,
-                    fill: true,
-                    tension: 0.3
-                }
-            ]
-        },
-        options: trendOpts
-    });
-
-    // ========== 3. Doughnut Charts ==========
+    // Doughnut common options
     const doughnutOpts = {
         responsive: true,
         maintainAspectRatio: false,
@@ -575,81 +613,198 @@ $netBalance   = $totalIncome - $totalExpense;
         }
     };
 
-    // Income Pie
-    if (incCatLabels.length > 0) {
-        new Chart(document.getElementById('incomePieChart'), {
-            type: 'doughnut',
-            data: {
-                labels: incCatLabels,
-                datasets: [{
-                    data: incCatValues,
-                    backgroundColor: palette.slice(0, incCatLabels.length),
-                    borderWidth: 2,
-                    borderColor: '#fff'
-                }]
-            },
-            options: doughnutOpts
-        });
-    } else {
-        document.getElementById('incomePieChart').parentElement.innerHTML += '<p style="text-align:center;color:#a0aec0;padding:40px 0;">No income data</p>';
-    }
+    const dataLabelOpts = {
+        display: true,
+        anchor: 'end',
+        align: 'end',
+        offset: 2,
+        font: { size: 10, weight: '600' },
+        color: '#2d3748',
+        formatter: function(v) {
+            if (v === 0) return '';
+            return 'RM ' + v.toLocaleString('en-MY', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+        }
+    };
 
-    // Expense Pie
-    if (expCatLabels.length > 0) {
-        new Chart(document.getElementById('expensePieChart'), {
-            type: 'doughnut',
-            data: {
-                labels: expCatLabels,
-                datasets: [{
-                    data: expCatValues,
-                    backgroundColor: palette.slice(0, expCatLabels.length),
-                    borderWidth: 2,
-                    borderColor: '#fff'
-                }]
-            },
-            options: doughnutOpts
-        });
-    } else {
-        document.getElementById('expensePieChart').parentElement.innerHTML += '<p style="text-align:center;color:#a0aec0;padding:40px 0;">No expense data</p>';
-    }
+    if (isClaims) {
+        // ========== CLAIMS CHARTS ==========
+        const claimPending  = <?php echo $jsClaimPending; ?>;
+        const claimApproved = <?php echo $jsClaimApproved; ?>;
+        const claimRejected = <?php echo $jsClaimRejected; ?>;
+        const claimStatusLabels = <?php echo $jsClaimStatusLabels; ?>;
+        const claimStatusValues = <?php echo $jsClaimStatusValues; ?>;
+        const claimCatLabels = <?php echo $jsClaimCatLabels; ?>;
+        const claimCatValues = <?php echo $jsClaimCatValues; ?>;
 
-    // ========== 4. Branch Comparison ==========
-    const branchCanvas = document.getElementById('branchChart');
-    if (branchCanvas) {
-        const branchNames = Object.keys(branchData);
-        // Calculate net per branch per month
-        const datasets = branchNames.map((bn, i) => {
-            const netData = monthKeys.map(mk => {
-                const inc = (branchData[bn].income && branchData[bn].income[mk]) || 0;
-                const exp = (branchData[bn].expense && branchData[bn].expense[mk]) || 0;
-                return inc - exp;
+        // 1. Claim Bar Chart (by status per month)
+        const clBarOpts = JSON.parse(JSON.stringify(commonOpts));
+        clBarOpts.plugins.datalabels = dataLabelOpts;
+        new Chart(document.getElementById('claimBarChart'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Pending', data: claimPending, backgroundColor: pendingColorBg, borderColor: pendingColor, borderWidth: 2, borderRadius: 4 },
+                    { label: 'Approved', data: claimApproved, backgroundColor: approvedColorBg, borderColor: approvedColor, borderWidth: 2, borderRadius: 4 },
+                    { label: 'Rejected', data: claimRejected, backgroundColor: rejectedColorBg, borderColor: rejectedColor, borderWidth: 2, borderRadius: 4 }
+                ]
+            },
+            options: clBarOpts
+        });
+
+        // 2. Claim Trend Chart
+        const clTrendOpts = JSON.parse(JSON.stringify(commonOpts));
+        clTrendOpts.plugins.datalabels = {
+            display: true, anchor: 'end', align: 'top', offset: 4,
+            font: { size: 10, weight: '600' },
+            color: function(ctx) { return ctx.dataset.borderColor; },
+            formatter: function(v) {
+                if (v === 0) return '';
+                return 'RM ' + v.toLocaleString('en-MY', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+            }
+        };
+        clTrendOpts.interaction = { intersect: false, mode: 'index' };
+
+        // Total claims per month for trend
+        const claimTotalPerMonth = labels.map((_, i) => claimPending[i] + claimApproved[i] + claimRejected[i]);
+
+        new Chart(document.getElementById('claimTrendChart'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Approved', data: claimApproved, borderColor: approvedColor, backgroundColor: 'rgba(56, 161, 105, 0.1)', borderWidth: 3, pointRadius: 5, pointHoverRadius: 7, pointBackgroundColor: approvedColor, fill: true, tension: 0.3 },
+                    { label: 'Pending', data: claimPending, borderColor: pendingColor, backgroundColor: 'rgba(214, 158, 46, 0.1)', borderWidth: 3, pointRadius: 5, pointHoverRadius: 7, pointBackgroundColor: pendingColor, fill: true, tension: 0.3 },
+                    { label: 'Rejected', data: claimRejected, borderColor: rejectedColor, backgroundColor: 'rgba(229, 62, 62, 0.1)', borderWidth: 3, pointRadius: 5, pointHoverRadius: 7, pointBackgroundColor: rejectedColor, fill: true, tension: 0.3 }
+                ]
+            },
+            options: clTrendOpts
+        });
+
+        // 3. Claims Status Pie
+        if (claimStatusValues.some(v => v > 0)) {
+            new Chart(document.getElementById('claimStatusPie'), {
+                type: 'doughnut',
+                data: {
+                    labels: claimStatusLabels,
+                    datasets: [{ data: claimStatusValues, backgroundColor: [pendingColor, approvedColor, rejectedColor], borderWidth: 2, borderColor: '#fff' }]
+                },
+                options: doughnutOpts
             });
-            return {
-                label: bn,
-                data: netData,
-                borderColor: palette[i % palette.length],
-                backgroundColor: palette[i % palette.length] + '33',
-                borderWidth: 2,
-                pointRadius: 4,
-                fill: false,
-                tension: 0.3
-            };
+        } else {
+            document.getElementById('claimStatusPie').parentElement.innerHTML += '<p style="text-align:center;color:#a0aec0;padding:40px 0;">No claims data</p>';
+        }
+
+        // 4. Claims Category Pie
+        if (claimCatLabels.length > 0) {
+            new Chart(document.getElementById('claimCatPie'), {
+                type: 'doughnut',
+                data: {
+                    labels: claimCatLabels,
+                    datasets: [{ data: claimCatValues, backgroundColor: palette.slice(0, claimCatLabels.length), borderWidth: 2, borderColor: '#fff' }]
+                },
+                options: doughnutOpts
+            });
+        } else {
+            document.getElementById('claimCatPie').parentElement.innerHTML += '<p style="text-align:center;color:#a0aec0;padding:40px 0;">No claims data</p>';
+        }
+
+    } else {
+        // ========== INCOME / EXPENSES CHARTS ==========
+
+        // 1. Bar Chart
+        const barOpts = JSON.parse(JSON.stringify(commonOpts));
+        barOpts.plugins.datalabels = dataLabelOpts;
+        new Chart(document.getElementById('barChart'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Income', data: incomeData, backgroundColor: incomeColorBg, borderColor: incomeColor, borderWidth: 2, borderRadius: 4 },
+                    { label: 'Expenses', data: expenseData, backgroundColor: expenseColorBg, borderColor: expenseColor, borderWidth: 2, borderRadius: 4 }
+                ]
+            },
+            options: barOpts
         });
 
-        const branchOpts = JSON.parse(JSON.stringify(commonOpts));
-        branchOpts.plugins.tooltip = {
+        // 2. Trend Chart
+        const trendOpts = JSON.parse(JSON.stringify(commonOpts));
+        trendOpts.plugins.tooltip = {
             callbacks: {
                 label: function(ctx) {
                     return ctx.dataset.label + ': RM ' + ctx.parsed.y.toLocaleString('en-MY', {minimumFractionDigits: 2});
                 }
             }
         };
+        trendOpts.plugins.datalabels = {
+            display: true, anchor: 'end', align: 'top', offset: 4,
+            font: { size: 10, weight: '600' },
+            color: function(ctx) { return ctx.dataset.borderColor; },
+            formatter: function(v) {
+                if (v === 0) return '';
+                return 'RM ' + v.toLocaleString('en-MY', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+            }
+        };
+        trendOpts.interaction = { intersect: false, mode: 'index' };
 
-        new Chart(branchCanvas, {
+        new Chart(document.getElementById('trendChart'), {
             type: 'line',
-            data: { labels: labels, datasets: datasets },
-            options: branchOpts
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Income', data: incomeData, borderColor: incomeColor, backgroundColor: 'rgba(56, 161, 105, 0.1)', borderWidth: 3, pointRadius: 5, pointHoverRadius: 7, pointBackgroundColor: incomeColor, fill: true, tension: 0.3 },
+                    { label: 'Expenses', data: expenseData, borderColor: expenseColor, backgroundColor: 'rgba(229, 62, 62, 0.1)', borderWidth: 3, pointRadius: 5, pointHoverRadius: 7, pointBackgroundColor: expenseColor, fill: true, tension: 0.3 }
+                ]
+            },
+            options: trendOpts
         });
+
+        // 3. Income Pie
+        if (incCatLabels.length > 0) {
+            new Chart(document.getElementById('incomePieChart'), {
+                type: 'doughnut',
+                data: { labels: incCatLabels, datasets: [{ data: incCatValues, backgroundColor: palette.slice(0, incCatLabels.length), borderWidth: 2, borderColor: '#fff' }] },
+                options: doughnutOpts
+            });
+        } else {
+            document.getElementById('incomePieChart').parentElement.innerHTML += '<p style="text-align:center;color:#a0aec0;padding:40px 0;">No income data</p>';
+        }
+
+        // 4. Expense Pie
+        if (expCatLabels.length > 0) {
+            new Chart(document.getElementById('expensePieChart'), {
+                type: 'doughnut',
+                data: { labels: expCatLabels, datasets: [{ data: expCatValues, backgroundColor: palette.slice(0, expCatLabels.length), borderWidth: 2, borderColor: '#fff' }] },
+                options: doughnutOpts
+            });
+        } else {
+            document.getElementById('expensePieChart').parentElement.innerHTML += '<p style="text-align:center;color:#a0aec0;padding:40px 0;">No expense data</p>';
+        }
+
+        // 5. Branch Comparison
+        const branchCanvas = document.getElementById('branchChart');
+        if (branchCanvas) {
+            const branchNames = Object.keys(branchData);
+            const datasets = branchNames.map((bn, i) => {
+                const netData = monthKeys.map(mk => {
+                    const inc = (branchData[bn].income && branchData[bn].income[mk]) || 0;
+                    const exp = (branchData[bn].expense && branchData[bn].expense[mk]) || 0;
+                    return inc - exp;
+                });
+                return {
+                    label: bn, data: netData,
+                    borderColor: palette[i % palette.length],
+                    backgroundColor: palette[i % palette.length] + '33',
+                    borderWidth: 2, pointRadius: 4, fill: false, tension: 0.3
+                };
+            });
+
+            const branchOpts = JSON.parse(JSON.stringify(commonOpts));
+            branchOpts.plugins.tooltip = {
+                callbacks: { label: function(ctx) { return ctx.dataset.label + ': RM ' + ctx.parsed.y.toLocaleString('en-MY', {minimumFractionDigits: 2}); } }
+            };
+            new Chart(branchCanvas, { type: 'line', data: { labels: labels, datasets: datasets }, options: branchOpts });
+        }
     }
 })();
 </script>

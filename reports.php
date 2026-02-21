@@ -46,6 +46,7 @@ include __DIR__ . '/includes/header.php';
                         <option value="income">Income (Detailed)</option>
                         <option value="expenses">Expenses (Detailed)</option>
                         <option value="overall" selected>Income / Expenses (Overall)</option>
+                        <option value="claims">Claims</option>
                     </select>
                 </div>
 

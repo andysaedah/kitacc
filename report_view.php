@@ -183,11 +183,79 @@ if ($reportType === 'income' || $reportType === 'expenses') {
     $categoryTotals = $catStmt->fetchAll();
 }
 
+// ========================================
+// CLAIMS REPORT
+// ========================================
+if ($reportType === 'claims') {
+    $claimBranchFilter = $branchId ? 'AND cl.branch_id = ?' : '';
+    $claimBranchParams = $branchId ? [$branchId] : [];
+
+    // Detailed claims list
+    $clSql = "SELECT cl.*, 
+                u.display_name AS submitter_name,
+                c.name AS category_name,
+                a.name AS account_name,
+                ap.display_name AS approver_name
+              FROM claims cl
+              LEFT JOIN users u ON cl.submitted_by = u.id
+              LEFT JOIN categories c ON cl.category_id = c.id
+              LEFT JOIN accounts a ON cl.account_id = a.id
+              LEFT JOIN users ap ON cl.approved_by = ap.id
+              WHERE cl.created_at BETWEEN ? AND ?
+              {$claimBranchFilter}
+              ORDER BY cl.created_at DESC";
+    $clStmt = $pdo->prepare($clSql);
+    $clStmt->execute(array_merge([$startDate, $endDate . ' 23:59:59'], $claimBranchParams));
+    $claimsList = $clStmt->fetchAll();
+
+    // Summary by status
+    $clSumSql = "SELECT cl.status, COUNT(*) AS cnt, SUM(cl.amount) AS total
+                 FROM claims cl
+                 WHERE cl.created_at BETWEEN ? AND ?
+                 {$claimBranchFilter}
+                 GROUP BY cl.status";
+    $clSumStmt = $pdo->prepare($clSumSql);
+    $clSumStmt->execute(array_merge([$startDate, $endDate . ' 23:59:59'], $claimBranchParams));
+    $claimSummary = [];
+    foreach ($clSumStmt->fetchAll() as $cs) {
+        $claimSummary[$cs['status']] = ['count' => (int) $cs['cnt'], 'total' => floatval($cs['total'])];
+    }
+
+    // Monthly breakdown
+    $clMonthSql = "SELECT cl.status,
+                     DATE_FORMAT(cl.created_at, '%Y-%c') AS ym,
+                     COUNT(*) AS cnt, SUM(cl.amount) AS total
+                   FROM claims cl
+                   WHERE cl.created_at BETWEEN ? AND ?
+                   {$claimBranchFilter}
+                   GROUP BY cl.status, ym
+                   ORDER BY ym";
+    $clMonthStmt = $pdo->prepare($clMonthSql);
+    $clMonthStmt->execute(array_merge([$startDate, $endDate . ' 23:59:59'], $claimBranchParams));
+    $claimMonthly = ['pending' => [], 'approved' => [], 'rejected' => []];
+    foreach ($clMonthStmt->fetchAll() as $cm) {
+        $claimMonthly[$cm['status']][$cm['ym']] = floatval($cm['total']);
+    }
+
+    // By category
+    $clCatSql = "SELECT c.name AS category_name, cl.status, SUM(cl.amount) AS total
+                 FROM claims cl
+                 LEFT JOIN categories c ON cl.category_id = c.id
+                 WHERE cl.created_at BETWEEN ? AND ?
+                 {$claimBranchFilter}
+                 GROUP BY c.name, cl.status
+                 ORDER BY total DESC";
+    $clCatStmt = $pdo->prepare($clCatSql);
+    $clCatStmt->execute(array_merge([$startDate, $endDate . ' 23:59:59'], $claimBranchParams));
+    $claimCategories = $clCatStmt->fetchAll();
+}
+
 // Report title
 $reportTypeLabels = [
     'income' => 'Income',
     'expenses' => 'Expenses',
-    'overall' => 'Overall'
+    'overall' => 'Overall',
+    'claims' => 'Claims'
 ];
 $typeLabel = $reportTypeLabels[$reportType] ?? 'Report';
 $branchLabel = $branchId ? ($branches[0]['name'] ?? '') : '';
@@ -679,6 +747,172 @@ function fmtVal($val, $highlight = false)
                         <td><strong>TOTAL (RM) =</strong></td>
                         <td class="text-right overall-highlight">
                             <strong><?php echo number_format($notesIncTotal, 2); ?></strong>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        <?php endif; ?>
+
+    <?php endif; ?>
+
+    <?php if ($reportType === 'claims'): ?>
+        <!-- ========================================
+         CLAIMS REPORT
+         ======================================== -->
+        <?php if ($branchId && !empty($branches)): ?>
+            <div class="report-subtitle" style="margin-bottom: 6px; color: #1a365d; font-weight: 700;">
+                <?php echo htmlspecialchars($branches[0]['name']); ?>
+            </div>
+        <?php endif; ?>
+
+        <!-- Claims Summary -->
+        <div style="margin-bottom: 12px;">
+            <table class="report-table" style="width: auto;">
+                <thead>
+                    <tr>
+                        <th class="text-left">Status</th>
+                        <th>Count</th>
+                        <th>Total (RM)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $statuses = ['pending', 'approved', 'rejected'];
+                    $statusLabels = ['pending' => 'Pending', 'approved' => 'Approved', 'rejected' => 'Rejected'];
+                    $statusColors = ['pending' => '#d69e2e', 'approved' => '#38a169', 'rejected' => '#e53e3e'];
+                    $grandClaimCount = 0;
+                    $grandClaimTotal = 0;
+                    foreach ($statuses as $st):
+                        $cnt = $claimSummary[$st]['count'] ?? 0;
+                        $tot = $claimSummary[$st]['total'] ?? 0;
+                        $grandClaimCount += $cnt;
+                        $grandClaimTotal += $tot;
+                    ?>
+                        <tr>
+                            <td style="color: <?php echo $statusColors[$st]; ?>; font-weight: 600;">
+                                <?php echo $statusLabels[$st]; ?>
+                            </td>
+                            <td><?php echo $cnt; ?></td>
+                            <td><?php echo number_format($tot, 2); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <tr class="total-row">
+                        <td>Total</td>
+                        <td><?php echo $grandClaimCount; ?></td>
+                        <td><?php echo number_format($grandClaimTotal, 2); ?></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Monthly Breakdown -->
+        <?php if (count($monthColumns) > 1): ?>
+        <div style="margin-bottom: 12px;">
+            <div style="font-size: 11px; font-weight: 700; color: #1a365d; margin-bottom: 4px;">Claims by Month (RM)</div>
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th class="text-left">Status</th>
+                        <?php foreach ($monthColumns as $mc): ?>
+                            <th><?php echo $mc['label']; ?></th>
+                        <?php endforeach; ?>
+                        <th class="overall-highlight">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $monthGrandTotals = array_fill_keys(array_column($monthColumns, 'key'), 0);
+                    foreach ($statuses as $st):
+                        $rowTotal = 0;
+                    ?>
+                        <tr>
+                            <td style="color: <?php echo $statusColors[$st]; ?>; font-weight: 600;">
+                                <?php echo $statusLabels[$st]; ?>
+                            </td>
+                            <?php foreach ($monthColumns as $mc):
+                                $key = $mc['key'];
+                                $val = $claimMonthly[$st][$key] ?? 0;
+                                $rowTotal += $val;
+                                $monthGrandTotals[$key] += $val;
+                            ?>
+                                <td><?php echo fmtVal($val); ?></td>
+                            <?php endforeach; ?>
+                            <td class="overall-highlight"><?php echo fmtVal($rowTotal); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <tr class="total-row">
+                        <td>Total</td>
+                        <?php foreach ($monthColumns as $mc): ?>
+                            <td><?php echo fmtVal($monthGrandTotals[$mc['key']]); ?></td>
+                        <?php endforeach; ?>
+                        <td class="overall-highlight"><?php echo fmtVal($grandClaimTotal); ?></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <?php endif; ?>
+
+        <!-- Detailed Claims List -->
+        <div style="font-size: 11px; font-weight: 700; color: #1a365d; margin-bottom: 4px;">Claims Detail</div>
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th class="text-left" style="min-width: 60px;">Date</th>
+                    <th class="text-left">Submitted By</th>
+                    <th class="text-left">Title</th>
+                    <th class="text-left">Category</th>
+                    <th>Amount (RM)</th>
+                    <th>Status</th>
+                    <th class="text-left">Approved By</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($claimsList)): ?>
+                    <tr><td colspan="7" style="text-align: center; color: #a0aec0;">No claims found for this period</td></tr>
+                <?php else: ?>
+                    <?php foreach ($claimsList as $cl): ?>
+                        <tr>
+                            <td><?php echo date('d/m/Y', strtotime($cl['created_at'])); ?></td>
+                            <td><?php echo htmlspecialchars($cl['submitter_name'] ?? '-'); ?></td>
+                            <td><?php echo htmlspecialchars($cl['title'] ?: ($cl['description'] ? mb_substr($cl['description'], 0, 40) . '...' : '-')); ?></td>
+                            <td><?php echo htmlspecialchars($cl['category_name'] ?? '-'); ?></td>
+                            <td><?php echo number_format($cl['amount'], 2); ?></td>
+                            <td style="color: <?php echo $statusColors[$cl['status']] ?? '#333'; ?>; font-weight: 600;">
+                                <?php echo ucfirst($cl['status']); ?>
+                            </td>
+                            <td><?php echo htmlspecialchars($cl['approver_name'] ?? '-'); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+
+        <!-- Category Breakdown -->
+        <?php if (!empty($claimCategories)): ?>
+            <div class="notes-section">
+                <h4>Claims by Category (RM) :</h4>
+                <table>
+                    <?php
+                    $catTotals = [];
+                    foreach ($claimCategories as $cc) {
+                        $name = $cc['category_name'] ?: 'Uncategorized';
+                        if (!isset($catTotals[$name])) $catTotals[$name] = 0;
+                        $catTotals[$name] += floatval($cc['total']);
+                    }
+                    arsort($catTotals);
+                    $catGrand = 0;
+                    foreach ($catTotals as $name => $total):
+                        $catGrand += $total;
+                    ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($name); ?> =</td>
+                            <td class="text-right"><?php echo number_format($total, 2); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <tr class="notes-total">
+                        <td><strong>TOTAL (RM) =</strong></td>
+                        <td class="text-right overall-highlight">
+                            <strong><?php echo number_format($catGrand, 2); ?></strong>
                         </td>
                     </tr>
                 </table>
