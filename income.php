@@ -8,7 +8,7 @@ requireLogin();
 requireRole(ROLE_BRANCH_FINANCE);
 
 $user = getCurrentUser();
-$branchId = getActiveBranchId();
+$branchId = getActiveBranchId() ?? $user['branch_id'];
 $page_title = 'Income - KiTAcc';
 
 // Fetch accounts & categories for form dropdowns

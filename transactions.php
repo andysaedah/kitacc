@@ -8,7 +8,7 @@ requireLogin();
 requireRole(ROLE_USER);
 
 $user = getCurrentUser();
-$branchId = getActiveBranchId();
+$branchId = getActiveBranchId() ?? $user['branch_id'];
 $page_title = 'Transactions - KiTAcc';
 
 // Filters

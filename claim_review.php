@@ -9,7 +9,7 @@ requireLogin();
 requireRole(ROLE_BRANCH_FINANCE);
 
 $user = getCurrentUser();
-$branchId = getActiveBranchId();
+$branchId = getActiveBranchId() ?? $user['branch_id'];
 $page_title = 'Review Claims - KiTAcc';
 
 // Active tab from URL (defaults to pending)
