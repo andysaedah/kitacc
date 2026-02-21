@@ -178,6 +178,7 @@ $jsMonthKeys  = json_encode(array_column($monthColumns, 'key'));
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Visual Chart - <?php echo htmlspecialchars($churchName); ?> <?php echo $periodLabel; ?></title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -389,6 +390,11 @@ $netBalance   = $totalIncome - $totalExpense;
 
 <script>
 (function() {
+    // Register datalabels plugin globally
+    Chart.register(ChartDataLabels);
+    // Default: disable datalabels globally (enable per-chart)
+    Chart.defaults.plugins.datalabels = { display: false };
+
     const labels     = <?php echo $jsLabels; ?>;
     const incomeData = <?php echo $jsIncome; ?>;
     const expenseData = <?php echo $jsExpenses; ?>;
@@ -440,6 +446,19 @@ $netBalance   = $totalIncome - $totalExpense;
     };
 
     // ========== 1. Bar Chart ==========
+    const barOpts = JSON.parse(JSON.stringify(commonOpts));
+    barOpts.plugins.datalabels = {
+        display: true,
+        anchor: 'end',
+        align: 'end',
+        offset: 2,
+        font: { size: 10, weight: '600' },
+        color: '#2d3748',
+        formatter: function(v) {
+            if (v === 0) return '';
+            return 'RM ' + v.toLocaleString('en-MY', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+        }
+    };
     new Chart(document.getElementById('barChart'), {
         type: 'bar',
         data: {
@@ -463,7 +482,7 @@ $netBalance   = $totalIncome - $totalExpense;
                 }
             ]
         },
-        options: commonOpts
+        options: barOpts
     });
 
     // ========== 2. Trend Chart ==========
@@ -473,6 +492,20 @@ $netBalance   = $totalIncome - $totalExpense;
             label: function(ctx) {
                 return ctx.dataset.label + ': RM ' + ctx.parsed.y.toLocaleString('en-MY', {minimumFractionDigits: 2});
             }
+        }
+    };
+    trendOpts.plugins.datalabels = {
+        display: true,
+        anchor: 'end',
+        align: 'top',
+        offset: 4,
+        font: { size: 10, weight: '600' },
+        color: function(ctx) {
+            return ctx.dataset.borderColor;
+        },
+        formatter: function(v) {
+            if (v === 0) return '';
+            return 'RM ' + v.toLocaleString('en-MY', {minimumFractionDigits: 0, maximumFractionDigits: 0});
         }
     };
     trendOpts.interaction = { intersect: false, mode: 'index' };
