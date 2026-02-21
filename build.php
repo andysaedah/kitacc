@@ -11,6 +11,12 @@
  * when APP_ENV=production in .env
  */
 
+// Block web access — CLI only
+if (php_sapi_name() !== 'cli') {
+    http_response_code(403);
+    exit('This script can only be run from the command line.');
+}
+
 echo "KiTAcc Asset Builder\n";
 echo str_repeat('=', 40) . "\n\n";
 

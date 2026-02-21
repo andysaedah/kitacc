@@ -19,6 +19,9 @@ Options -Indexes
     RewriteRule ^database/ - [F,L]
     RewriteRule ^migrationdb/ - [F,L]
 
+    # Block CLI-only scripts from web access
+    RewriteRule ^build\.php$ - [F,L]
+
     # Block hidden files and directories
     RewriteRule (^|/)\.(?!well-known) - [F,L]
 </IfModule>
