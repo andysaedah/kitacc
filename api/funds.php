@@ -121,6 +121,15 @@ try {
             if ($stmt->rowCount() < 2)
                 throw new Exception('One or both funds not found.');
 
+            // Fund balance validation
+            $fromBal = getFundBalance($fromFundId);
+            if ($amount > $fromBal) {
+                $fnStmt = $pdo->prepare("SELECT name FROM funds WHERE id = ?");
+                $fnStmt->execute([$fromFundId]);
+                $fundName = $fnStmt->fetchColumn() ?: 'Source fund';
+                throw new Exception($fundName . ' has insufficient balance (RM ' . number_format($fromBal, 2) . ' available).');
+            }
+
             $pdo->prepare("INSERT INTO fund_transfers (branch_id, from_fund_id, to_fund_id, amount, description, created_by) VALUES (?, ?, ?, ?, ?, ?)")
                 ->execute([$branchId, $fromFundId, $toFundId, $amount, $description, $user['id']]);
 

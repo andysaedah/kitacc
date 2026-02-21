@@ -72,6 +72,24 @@ try {
                     throw new Exception('Invalid account selected.');
             }
 
+            // Fund balance validation for expenses (fund mode)
+            if ($type === 'expense' && isFundMode()) {
+                $checkFundId = $fundId;
+                if (!$checkFundId) {
+                    // No fund selected = General Fund
+                    $checkFundId = getGeneralFundId($branchId);
+                }
+                if ($checkFundId) {
+                    $fundBal = getFundBalance($checkFundId);
+                    if ($amount > $fundBal) {
+                        $fnStmt = $pdo->prepare("SELECT name FROM funds WHERE id = ?");
+                        $fnStmt->execute([$checkFundId]);
+                        $fundName = $fnStmt->fetchColumn() ?: 'Selected fund';
+                        throw new Exception($fundName . ' has insufficient balance (RM ' . number_format($fundBal, 2) . ' available).');
+                    }
+                }
+            }
+
             // Receipt upload
             $receiptPath = null;
             if (!empty($_FILES['receipt']) && $_FILES['receipt']['error'] === UPLOAD_ERR_OK) {

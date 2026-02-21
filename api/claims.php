@@ -155,6 +155,23 @@ try {
             if ($user['role'] !== ROLE_SUPERADMIN && $claim['branch_id'] != $branchId)
                 throw new Exception('Claim not found or already processed.');
 
+            // Fund balance validation (fund mode)
+            if (isFundMode()) {
+                $checkFundId = $fundId;
+                if (!$checkFundId) {
+                    $checkFundId = getGeneralFundId($claim['branch_id']);
+                }
+                if ($checkFundId) {
+                    $fundBal = getFundBalance($checkFundId);
+                    if ($claim['amount'] > $fundBal) {
+                        $fnStmt = $pdo->prepare("SELECT name FROM funds WHERE id = ?");
+                        $fnStmt->execute([$checkFundId]);
+                        $fundName = $fnStmt->fetchColumn() ?: 'Selected fund';
+                        throw new Exception($fundName . ' has insufficient balance (RM ' . number_format($fundBal, 2) . ' available).');
+                    }
+                }
+            }
+
             // Update claim
             $pdo->prepare("UPDATE claims SET status = 'approved', approved_by = ?, approved_at = NOW() WHERE id = ?")
                 ->execute([$user['id'], $id]);

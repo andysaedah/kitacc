@@ -284,6 +284,44 @@ function getChurchName(): string
     return getSetting('church_name', getenv('CHURCH_NAME') ?: 'My Church');
 }
 
+/**
+ * Calculate the current balance of a fund.
+ * For General Fund: includes unallocated transactions + account starting balances.
+ * Returns the calculated balance as a float.
+ */
+function getFundBalance(int $fundId): float
+{
+    $pdo = db();
+    $stmt = $pdo->prepare("SELECT f.*,
+                COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.fund_id = f.id AND t.type = 'income'), 0)
+                - COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.fund_id = f.id AND t.type = 'expense'), 0)
+                + COALESCE((SELECT SUM(ft.amount) FROM fund_transfers ft WHERE ft.to_fund_id = f.id), 0)
+                - COALESCE((SELECT SUM(ft.amount) FROM fund_transfers ft WHERE ft.from_fund_id = f.id), 0)
+                + CASE WHEN f.name = 'General Fund' THEN
+                    COALESCE((SELECT SUM(t2.amount) FROM transactions t2 WHERE t2.fund_id IS NULL AND t2.type = 'income' AND t2.branch_id = f.branch_id), 0)
+                    - COALESCE((SELECT SUM(t2.amount) FROM transactions t2 WHERE t2.fund_id IS NULL AND t2.type = 'expense' AND t2.branch_id = f.branch_id), 0)
+                    + COALESCE((SELECT SUM(a.balance) FROM accounts a WHERE a.is_active = 1 AND a.branch_id = f.branch_id), 0)
+                  ELSE 0 END
+                AS balance
+            FROM funds f WHERE f.id = ?");
+    $stmt->execute([$fundId]);
+    $row = $stmt->fetch();
+    return $row ? floatval($row['balance']) : 0.0;
+}
+
+/**
+ * Get the General Fund ID for a given branch.
+ * Returns fund ID or null if not found.
+ */
+function getGeneralFundId(int $branchId): ?int
+{
+    $pdo = db();
+    $stmt = $pdo->prepare("SELECT id FROM funds WHERE name = 'General Fund' AND branch_id = ? AND is_active = 1 LIMIT 1");
+    $stmt->execute([$branchId]);
+    $id = $stmt->fetchColumn();
+    return $id ? intval($id) : null;
+}
+
 // ========================================
 // CSRF ALIAS
 // ========================================
