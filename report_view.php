@@ -192,10 +192,10 @@ if ($reportType === 'claims') {
 
     // Detailed claims list
     $clSql = "SELECT cl.*, 
-                u.display_name AS submitter_name,
+                u.name AS submitter_name,
                 c.name AS category_name,
                 a.name AS account_name,
-                ap.display_name AS approver_name
+                ap.name AS approver_name
               FROM claims cl
               LEFT JOIN users u ON cl.submitted_by = u.id
               LEFT JOIN categories c ON cl.category_id = c.id
