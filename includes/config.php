@@ -44,6 +44,20 @@ if (file_exists($envPath)) {
 date_default_timezone_set(getenv('APP_TIMEZONE') ?: 'Asia/Kuala_Lumpur');
 
 // ========================================
+// ERROR DISPLAY (based on APP_DEBUG)
+// ========================================
+$appDebug = filter_var(getenv('APP_DEBUG'), FILTER_VALIDATE_BOOLEAN);
+if ($appDebug) {
+    ini_set('display_errors', '1');
+    ini_set('display_startup_errors', '1');
+    error_reporting(E_ALL);
+} else {
+    ini_set('display_errors', '0');
+    ini_set('display_startup_errors', '0');
+    error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
+}
+
+// ========================================
 // SESSION
 // ========================================
 if (session_status() === PHP_SESSION_NONE) {
