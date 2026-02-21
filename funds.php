@@ -28,18 +28,13 @@ try {
     }
 
     // Fetch funds with calculated balances
-    // General Fund also includes transactions with fund_id IS NULL (unallocated)
-    // and account starting balances for the branch
+    // Non-General funds: income - expenses + transfers_in - transfers_out
+    // General Fund: Total Account Balances - Sum of all other fund balances
     $sql = "SELECT f.*,
                 COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.fund_id = f.id AND t.type = 'income'), 0)
                 - COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.fund_id = f.id AND t.type = 'expense'), 0)
                 + COALESCE((SELECT SUM(ft.amount) FROM fund_transfers ft WHERE ft.to_fund_id = f.id), 0)
                 - COALESCE((SELECT SUM(ft.amount) FROM fund_transfers ft WHERE ft.from_fund_id = f.id), 0)
-                + CASE WHEN f.name = 'General Fund' THEN
-                    COALESCE((SELECT SUM(t2.amount) FROM transactions t2 WHERE t2.fund_id IS NULL AND t2.type = 'income' AND t2.branch_id = f.branch_id), 0)
-                    - COALESCE((SELECT SUM(t2.amount) FROM transactions t2 WHERE t2.fund_id IS NULL AND t2.type = 'expense' AND t2.branch_id = f.branch_id), 0)
-                    + COALESCE((SELECT SUM(a.balance) FROM accounts a WHERE a.is_active = 1 AND a.branch_id = f.branch_id), 0)
-                  ELSE 0 END
                 AS balance
             FROM funds f WHERE f.is_active = 1";
     $params = [];
@@ -52,7 +47,7 @@ try {
     $stmt->execute($params);
     $funds = $stmt->fetchAll();
 
-    // Total account balances (for comparison)
+    // Total account balances
     $accSql = "SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE is_active = 1";
     $accParams = [];
     if ($branchId !== null) {
@@ -63,7 +58,21 @@ try {
     $totalAccountBalance->execute($accParams);
     $totalAccounts = floatval($totalAccountBalance->fetchColumn());
 
-    // Total fund balances
+    // Recalculate General Fund = Total Accounts - Sum of other funds
+    $otherFundsTotal = 0;
+    foreach ($funds as &$fund) {
+        if ($fund['name'] !== 'General Fund') {
+            $otherFundsTotal += floatval($fund['balance']);
+        }
+    }
+    foreach ($funds as &$fund) {
+        if ($fund['name'] === 'General Fund') {
+            $fund['balance'] = $totalAccounts - $otherFundsTotal;
+        }
+    }
+    unset($fund);
+
+    // Total fund balances (now guaranteed to equal total accounts)
     $totalFunds = array_sum(array_column($funds, 'balance'));
 
     // Transfer history

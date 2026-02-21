@@ -286,27 +286,58 @@ function getChurchName(): string
 
 /**
  * Calculate the current balance of a fund.
- * For General Fund: includes unallocated transactions + account starting balances.
+ * For General Fund: Total Account Balances minus all other fund balances (guarantees totals match).
+ * For other funds: income - expenses + transfers_in - transfers_out.
  * Returns the calculated balance as a float.
  */
 function getFundBalance(int $fundId): float
 {
     $pdo = db();
-    $stmt = $pdo->prepare("SELECT f.*,
-                COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.fund_id = f.id AND t.type = 'income'), 0)
-                - COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.fund_id = f.id AND t.type = 'expense'), 0)
-                + COALESCE((SELECT SUM(ft.amount) FROM fund_transfers ft WHERE ft.to_fund_id = f.id), 0)
-                - COALESCE((SELECT SUM(ft.amount) FROM fund_transfers ft WHERE ft.from_fund_id = f.id), 0)
-                + CASE WHEN f.name = 'General Fund' THEN
-                    COALESCE((SELECT SUM(t2.amount) FROM transactions t2 WHERE t2.fund_id IS NULL AND t2.type = 'income' AND t2.branch_id = f.branch_id), 0)
-                    - COALESCE((SELECT SUM(t2.amount) FROM transactions t2 WHERE t2.fund_id IS NULL AND t2.type = 'expense' AND t2.branch_id = f.branch_id), 0)
-                    + COALESCE((SELECT SUM(a.balance) FROM accounts a WHERE a.is_active = 1 AND a.branch_id = f.branch_id), 0)
-                  ELSE 0 END
-                AS balance
-            FROM funds f WHERE f.id = ?");
+
+    // Get fund details
+    $stmt = $pdo->prepare("SELECT id, name, branch_id FROM funds WHERE id = ?");
     $stmt->execute([$fundId]);
-    $row = $stmt->fetch();
-    return $row ? floatval($row['balance']) : 0.0;
+    $fund = $stmt->fetch();
+    if (!$fund) return 0.0;
+
+    if ($fund['name'] === 'General Fund') {
+        // General Fund = Total Account Balances - Sum of all other active fund balances
+        $branchId = $fund['branch_id'];
+
+        // Total account balances for this branch
+        $stmt2 = $pdo->prepare("SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE is_active = 1 AND branch_id = ?");
+        $stmt2->execute([$branchId]);
+        $totalAccounts = floatval($stmt2->fetchColumn());
+
+        // Sum of all other (non-General) fund balances for this branch
+        $stmt3 = $pdo->prepare("SELECT f.id,
+                    COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.fund_id = f.id AND t.type = 'income'), 0)
+                    - COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.fund_id = f.id AND t.type = 'expense'), 0)
+                    + COALESCE((SELECT SUM(ft.amount) FROM fund_transfers ft WHERE ft.to_fund_id = f.id), 0)
+                    - COALESCE((SELECT SUM(ft.amount) FROM fund_transfers ft WHERE ft.from_fund_id = f.id), 0)
+                    AS balance
+                FROM funds f
+                WHERE f.is_active = 1 AND f.branch_id = ? AND f.name != 'General Fund'");
+        $stmt3->execute([$branchId]);
+        $otherFundsTotal = 0.0;
+        while ($row = $stmt3->fetch()) {
+            $otherFundsTotal += floatval($row['balance']);
+        }
+
+        return $totalAccounts - $otherFundsTotal;
+    } else {
+        // Regular fund: income - expenses + transfers in - transfers out
+        $stmt2 = $pdo->prepare("SELECT
+                    COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.fund_id = f.id AND t.type = 'income'), 0)
+                    - COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.fund_id = f.id AND t.type = 'expense'), 0)
+                    + COALESCE((SELECT SUM(ft.amount) FROM fund_transfers ft WHERE ft.to_fund_id = f.id), 0)
+                    - COALESCE((SELECT SUM(ft.amount) FROM fund_transfers ft WHERE ft.from_fund_id = f.id), 0)
+                    AS balance
+                FROM funds f WHERE f.id = ?");
+        $stmt2->execute([$fundId]);
+        $row = $stmt2->fetch();
+        return $row ? floatval($row['balance']) : 0.0;
+    }
 }
 
 /**
