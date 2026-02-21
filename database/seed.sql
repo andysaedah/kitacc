@@ -31,6 +31,7 @@ INSERT INTO `categories` (`name`, `type`) VALUES
 ('Love Gift', 'income'),
 ('Contribution', 'income'),
 ('Donation', 'income'),
+('Sponsor', 'income'),
 ('Fundraising', 'income'),
 ('Others', 'income');
 
