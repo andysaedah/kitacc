@@ -35,7 +35,7 @@ try {
     // Funds (if fund mode)
     $funds = [];
     if (isFundMode()) {
-        $fsql = "SELECT id, name FROM funds WHERE is_active = 1";
+        $fsql = "SELECT id, name FROM funds WHERE is_active = 1 AND name != 'General Fund'";
         $fparams = [];
         if ($branchId !== null) {
             $fsql .= " AND branch_id = ?";

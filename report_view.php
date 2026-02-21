@@ -91,6 +91,24 @@ $branchStmt->execute($branchId ? [$branchId] : []);
 $branches = $branchStmt->fetchAll();
 
 // ========================================
+// FETCH ACCOUNT STARTING BALANCES (per branch)
+// ========================================
+$accountBalances = [];
+$accBalSql = "SELECT branch_id, COALESCE(SUM(balance), 0) AS total_balance FROM accounts WHERE is_active = 1";
+$accBalParams = [];
+if ($branchId) {
+    $accBalSql .= " AND branch_id = ?";
+    $accBalParams[] = $branchId;
+}
+$accBalSql .= " GROUP BY branch_id";
+$accBalStmt = $pdo->prepare($accBalSql);
+$accBalStmt->execute($accBalParams);
+foreach ($accBalStmt->fetchAll() as $ab) {
+    $accountBalances[$ab['branch_id']] = floatval($ab['total_balance']);
+}
+$totalAccountBalance = array_sum($accountBalances);
+
+// ========================================
 // FETCH DATA
 // ========================================
 
@@ -498,12 +516,29 @@ function fmtVal($val, $highlight = false)
                 $totalAllExpenses = 0;
 
                 foreach ($overallData as $branchName => $types):
+                    // Find this branch's account balance
+                    $branchAccBal = 0;
+                    foreach ($branches as $br) {
+                        if ($br['name'] === $branchName) {
+                            $branchAccBal = $accountBalances[$br['id']] ?? 0;
+                            break;
+                        }
+                    }
                     ?>
                     <!-- Branch Header -->
                     <tr class="branch-header">
                         <td colspan="<?php echo count($monthColumns) + 3; ?>">
                             <?php echo htmlspecialchars($branchName); ?>
                         </td>
+                    </tr>
+                    <!-- B/F row -->
+                    <tr style="background: #f7fafc;">
+                        <td style="padding-left: 12px; font-weight: 600; font-style: italic;">B/F (Account Balance)</td>
+                        <?php foreach ($monthColumns as $mc): ?>
+                            <td></td>
+                        <?php endforeach; ?>
+                        <td style="font-weight: 600;"><?php echo fmtVal($branchAccBal); ?></td>
+                        <td></td>
                     </tr>
                     <?php
                     // Income row
@@ -537,7 +572,7 @@ function fmtVal($val, $highlight = false)
                             <td><?php echo fmtVal($val); ?></td>
                         <?php endforeach; ?>
                         <td><?php echo fmtVal($expenseTotal); ?></td>
-                        <?php $branchBalance = $incomeTotal - $expenseTotal; ?>
+                        <?php $branchBalance = $branchAccBal + $incomeTotal - $expenseTotal; ?>
                         <td><?php echo fmtVal($branchBalance); ?></td>
                     </tr>
                     <?php
@@ -547,12 +582,21 @@ function fmtVal($val, $highlight = false)
                 ?>
 
                 <?php // Always show combined totals and summary ?>
-                <?php $totalBalance = $totalAllIncome - $totalAllExpenses; ?>
+                <?php $totalBalance = $totalAccountBalance + $totalAllIncome - $totalAllExpenses; ?>
                 <!-- Combined Totals -->
                 <tr class="branch-header">
                     <td colspan="<?php echo count($monthColumns) + 3; ?>">
                         <?php echo htmlspecialchars($churchName); ?>
                     </td>
+                </tr>
+                <!-- B/F Total row -->
+                <tr style="background: #f7fafc;">
+                    <td style="padding-left: 12px; font-weight: 600; font-style: italic;">B/F (Account Balance)</td>
+                    <?php foreach ($monthColumns as $mc): ?>
+                        <td></td>
+                    <?php endforeach; ?>
+                    <td style="font-weight: 600;"><?php echo fmtVal($totalAccountBalance); ?></td>
+                    <td></td>
                 </tr>
                 <tr class="subtotal-row">
                     <td style="padding-left: 12px;"><?php echo htmlspecialchars($churchName); ?> Income</td>
@@ -568,7 +612,7 @@ function fmtVal($val, $highlight = false)
                         <td><?php echo fmtVal($grandExpense[$mc['key']]); ?></td>
                     <?php endforeach; ?>
                     <td><?php echo fmtVal($totalAllExpenses); ?></td>
-                    <?php $totalBalance = $totalAllIncome - $totalAllExpenses; ?>
+                    <?php $totalBalance = $totalAccountBalance + $totalAllIncome - $totalAllExpenses; ?>
                     <td class="overall-highlight"><?php echo fmtVal($totalBalance); ?></td>
                 </tr>
                 <!-- Overall balance row -->
@@ -589,6 +633,10 @@ function fmtVal($val, $highlight = false)
         <div class="summary-section">
             <table>
                 <tr>
+                    <td class="label">Account Balance B/F (RM) =</td>
+                    <td class="value"><?php echo number_format($totalAccountBalance, 2); ?></td>
+                </tr>
+                <tr>
                     <td class="label">Total Income (RM) =</td>
                     <td class="value"><?php echo number_format($totalAllIncome, 2); ?></td>
                 </tr>
@@ -596,7 +644,7 @@ function fmtVal($val, $highlight = false)
                     <td class="label">Total Expenses (RM) =</td>
                     <td class="value"><?php echo number_format($totalAllExpenses, 2); ?></td>
                 </tr>
-                <?php $deficit = $totalAllIncome - $totalAllExpenses; ?>
+                <?php $deficit = $totalAccountBalance + $totalAllIncome - $totalAllExpenses; ?>
                 <tr>
                     <td class="label <?php echo $deficit < 0 ? 'text-danger' : ''; ?>">
                         Total <?php echo $deficit >= 0 ? 'Surplus' : 'Deficit'; ?> (RM) =

@@ -63,8 +63,9 @@ try {
     $stmt->execute($params);
     $claims = $stmt->fetchAll();
 
-    // Accounts for approval (only needed on pending tab)
+    // Accounts & funds for approval (only needed on pending tab)
     $accounts = [];
+    $funds = [];
     if ($activeStatus === 'pending') {
         $sql = "SELECT id, name FROM accounts WHERE is_active = 1";
         $params = [];
@@ -75,11 +76,25 @@ try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $accounts = $stmt->fetchAll();
+
+        if (isFundMode()) {
+            $fsql = "SELECT id, name FROM funds WHERE is_active = 1 AND name != 'General Fund'";
+            $fparams = [];
+            if ($branchId !== null) {
+                $fsql .= " AND branch_id = ?";
+                $fparams[] = $branchId;
+            }
+            $fsql .= " ORDER BY name";
+            $stmt = $pdo->prepare($fsql);
+            $stmt->execute($fparams);
+            $funds = $stmt->fetchAll();
+        }
     }
 
 } catch (Exception $e) {
     $claims = [];
     $accounts = [];
+    $funds = [];
     $pendingCount = $approvedCount = $rejectedCount = 0;
 }
 
@@ -226,6 +241,16 @@ include __DIR__ . '/includes/header.php';
                                 </option>
                             <?php endforeach; ?>
                         </select>
+                        <?php if (isFundMode()): ?>
+                        <select id="fund-<?php echo $cl['id']; ?>" class="form-control" style="max-width: 200px;">
+                            <option value="">General Fund</option>
+                            <?php foreach ($funds as $fund): ?>
+                                <option value="<?php echo $fund['id']; ?>">
+                                    <?php echo htmlspecialchars($fund['name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php endif; ?>
                         <button class="btn btn-success btn-sm" onclick="approveClaim(<?php echo $cl['id']; ?>)"><i
                                 class="fas fa-check"></i> Approve</button>
                         <button class="btn btn-danger btn-sm" onclick="rejectClaim(<?php echo $cl['id']; ?>)"><i
@@ -283,7 +308,11 @@ $page_scripts = <<<'SCRIPT'
         if (!accountId) { KiTAcc.toast('Please select an account to pay from.', 'warning'); return; }
         if (!KiTAcc.confirm('Approve this claim? An expense entry will be created automatically.')) return;
 
-        KiTAcc.post('api/claims.php', { action: 'approve', id: id, account_id: accountId }, function(res) {
+        var data = { action: 'approve', id: id, account_id: accountId };
+        var fundEl = document.getElementById('fund-' + id);
+        if (fundEl && fundEl.value) { data.fund_id = fundEl.value; }
+
+        KiTAcc.post('api/claims.php', data, function(res) {
             if (res.success) { KiTAcc.toast('Claim approved!', 'success'); setTimeout(() => location.reload(), 800); }
             else KiTAcc.toast(res.message || 'Error approving claim.', 'error');
         });

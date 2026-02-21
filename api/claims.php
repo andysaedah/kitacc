@@ -134,6 +134,7 @@ try {
 
             $id = intval($_POST['id'] ?? 0);
             $accountId = intval($_POST['account_id'] ?? 0);
+            $fundId = !empty($_POST['fund_id']) ? intval($_POST['fund_id']) : null;
             if (!$accountId)
                 throw new Exception('Select an account to pay from.');
 
@@ -164,12 +165,13 @@ try {
             $catStmt->execute();
             $claimCategoryId = $catStmt->fetchColumn() ?: $claim['category_id'];
 
-            $stmt = $pdo->prepare("INSERT INTO transactions (branch_id, type, date, amount, account_id, category_id, description, reference_number, receipt_path, created_by) VALUES (?, 'expense', CURDATE(), ?, ?, ?, ?, ?, ?, ?)");
+            $stmt = $pdo->prepare("INSERT INTO transactions (branch_id, type, date, amount, account_id, category_id, fund_id, description, reference_number, receipt_path, created_by) VALUES (?, 'expense', CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([
                 $claim['branch_id'],
                 $claim['amount'],
                 $accountId,
                 $claimCategoryId,
+                $fundId,
                 'Claim: ' . ($claim['description'] ?: $claim['title']),
                 'CLAIM-' . $id,
                 $claim['receipt_path'],
