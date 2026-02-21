@@ -558,6 +558,19 @@ $netBalance   = $totalIncome - $totalExpense;
                         return ctx.label + ': RM ' + ctx.parsed.toLocaleString('en-MY', {minimumFractionDigits: 2}) + ' (' + pct + '%)';
                     }
                 }
+            },
+            datalabels: {
+                display: true,
+                color: '#fff',
+                font: { size: 11, weight: '700' },
+                textShadowColor: 'rgba(0,0,0,0.4)',
+                textShadowBlur: 3,
+                formatter: function(value, ctx) {
+                    const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                    if (total === 0 || value === 0) return '';
+                    const pct = ((value / total) * 100).toFixed(1);
+                    return pct + '%';
+                }
             }
         }
     };
