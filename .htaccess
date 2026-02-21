@@ -14,6 +14,10 @@ Options -Indexes
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # Force HTTPS
+    RewriteCond %{HTTPS} off
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
     # Block includes, database, migrationdb directories
     RewriteRule ^includes/ - [F,L]
     RewriteRule ^database/ - [F,L]
