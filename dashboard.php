@@ -388,6 +388,8 @@ $chartDataJson = json_encode($chartData);
 $categoryBreakdownJson = json_encode($categoryBreakdown);
 $page_scripts = <<<SCRIPT
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script>Chart.register(ChartDataLabels);</script>
 <script>
     function filterByBranch(val) {
         window.location.href = 'dashboard.php?branch=' + encodeURIComponent(val);
@@ -435,7 +437,17 @@ $page_scripts = <<<SCRIPT
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'bottom' }
+                    legend: { position: 'bottom' },
+                    datalabels: {
+                        anchor: 'end',
+                        align: 'top',
+                        color: '#374051',
+                        font: { weight: 'bold', size: 11 },
+                        formatter: function(value) {
+                            if (!value) return '';
+                            return 'RM ' + value.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
+                        }
+                    }
                 },
                 scales: {
                     y: {
@@ -485,7 +497,18 @@ $page_scripts = <<<SCRIPT
                 maintainAspectRatio: false,
                 cutout: '65%',
                 plugins: {
-                    legend: { position: 'bottom' }
+                    legend: { position: 'bottom' },
+                    datalabels: {
+                        color: '#fff',
+                        font: { weight: 'bold', size: 12 },
+                        formatter: function(value, ctx) {
+                            const dataset = ctx.chart.data.datasets[0].data;
+                            const total = dataset.reduce((a, b) => a + b, 0);
+                            if (!total || !value) return '';
+                            const pct = ((value / total) * 100).toFixed(1);
+                            return pct + '%';
+                        }
+                    }
                 }
             }
         });
